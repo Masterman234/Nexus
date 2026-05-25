@@ -1,0 +1,52 @@
+# Build
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.*
+
+# Node
+node_modules/
+
+# React build
+dist/
+build/
+
+# Coverage
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# ASP.NET Core
+appsettings.Development.json
+
+# Secrets
+secrets.json
+
+# Docker
+*.pid
+
+# Test Results
+TestResults/
+
+# NuGet
+*.nupkg
+
+# JetBrains
+*.DotSettings.user
