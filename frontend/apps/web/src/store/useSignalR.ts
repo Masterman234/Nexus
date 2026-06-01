@@ -18,16 +18,23 @@ export function useSignalR() {
     }
 
     if (!connection.current) {
+      // In dev, force long-polling because Vite's WS proxy creates a brief race
+      // where SignalR's first WebSocket attempt fires before the server has
+      // registered the negotiated connection id. The retry succeeds — but the
+      // browser logs the failed first attempt as an unsilenceable red error.
+      // Long-polling avoids the race entirely. Prod uses real WebSockets via
+      // the same-origin API host.
+      const transport = import.meta.env.DEV
+        ? signalR.HttpTransportType.LongPolling
+        : signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling
+
       connection.current = new signalR.HubConnectionBuilder()
         .withUrl("/chatHub", {
           accessTokenFactory: () => token,
+          transport,
         })
         .withAutomaticReconnect()
-        // In dev the Vite WS proxy nudges SignalR into a transient transport race
-        // (negotiation succeeds, first WebSocket attempt sees a stale connection id).
-        // SignalR self-recovers — the noise is cosmetic — so suppress at Critical in dev.
-        // Prod serves the bundle from the API directly and never hits this.
-        .configureLogging(import.meta.env.DEV ? signalR.LogLevel.Critical : signalR.LogLevel.Warning)
+        .configureLogging(signalR.LogLevel.Warning)
         .build()
 
       connection.current.on("ReceiveMessage", (message: any) => {
