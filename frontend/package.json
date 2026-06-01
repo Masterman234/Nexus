@@ -1,0 +1,8 @@
+{
+  "name": "nexus-frontend",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build"
+  }
+}

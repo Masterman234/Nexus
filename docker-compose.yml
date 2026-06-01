@@ -1,0 +1,31 @@
+services:
+  nexus-db:
+    image: postgres:16-alpine
+    container_name: nexus-db
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: nexus
+    ports:
+      - "5433:5432"
+    volumes:
+      - nexus-db-data:/var/lib/postgresql/data
+
+  nexus-cache:
+    image: redis:7-alpine
+    container_name: nexus-cache
+    ports:
+      - "6379:6379"
+
+  nexus-mq:
+    image: rabbitmq:3-management-alpine
+    container_name: nexus-mq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+volumes:
+  nexus-db-data:

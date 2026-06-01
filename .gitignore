@@ -12,6 +12,12 @@ obj/
 # VS Code
 .vscode/
 
+# Visual Studio
+.vs/
+
+# Claude Code CLI (per-user session, settings, indexes)
+.claude/
+
 # Logs
 *.log
 
