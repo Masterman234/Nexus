@@ -214,20 +214,23 @@ public class GithubWebhookConsumer(
 
         // Legacy fallback for first-run dev: pick the OLDEST channel named 'general'.
         // Logging this loudly so misconfig in prod doesn't go unnoticed.
-        // Channels are seeded in UserCreatedConsumer with the literal lowercase
-        // string "general", so an exact match is correct (and SQL-translatable).
-        logger.LogWarning(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest channel named 'general'.");
+        logger.LogWarning(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest 'general' channel.");
+        
         var fallback = await dbContext.Channels
+            .Include(c => c.WorkspaceId) // We can't include Workspace easily without a navigation property
             .Where(c => c.Name == "general")
             .OrderBy(c => c.CreatedAt)
-            .Select(c => (Guid?)c.Id)
+            .Select(c => new { c.Id, c.Name })
             .FirstOrDefaultAsync(ct);
 
         if (fallback is null)
         {
             logger.LogError(">>> [BOT] ERROR: No channel named 'general' found in DB.");
+            return null;
         }
-        return fallback;
+
+        logger.LogInformation(">>> [BOT] Bot will post to channel '{ChannelName}' (Id: {ChannelId}). Ensure your UI is viewing this channel.", fallback.Name, fallback.Id);
+        return fallback.Id;
     }
 
     private static string BuildDisplayMessage(string eventType, string payload)

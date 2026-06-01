@@ -38,6 +38,7 @@ export function useSignalR() {
         .build()
 
       connection.current.on("ReceiveMessage", (message: any) => {
+        console.log("%c [SignalR] Received Message:", "color: #06B6D4; font-weight: bold", message)
         const channelId = message.channelId || message.ChannelId
         if (channelId) {
           addMessage(channelId, {
