@@ -19,7 +19,11 @@ This document outlines the high-level milestones for bringing Nexus from concept
 ## Milestone 3: Engineering Context & VCS Integration (Weeks 6-8)
 - [ ] Engineering Context: Tickets, Pull Requests, Commits.
 - [x] Background workers (RabbitMQ): Foundation configured and consumer-ready.
-- [ ] Integration Events: Broadcasting `PullRequestMerged` across the bus.
+- [x] GitHub webhook ingestion: HMAC-verified controller, ExternalEvent persistence,
+      RabbitMQ-backed `GithubWebhookConsumer` posting to a configurable channel,
+      SignalR broadcast through to the frontend chat (push + pull_request events).
+- [ ] Integration Events: Broadcasting `PullRequestMerged` across the bus
+      (current consumer emits a chat message; needs domain modelling of PR state).
 - [ ] Frontend: Kanban board, PR timeline views.
 
 ## Milestone 4: Observability & AI (Weeks 9-11)

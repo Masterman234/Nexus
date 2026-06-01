@@ -18,9 +18,9 @@ The following epics form the initial product backlog for Nexus. They are designe
 ## EPIC-03: Event-Driven Engineering Data
 **Goal**: Nexus can ingest and display code repository data asynchronously.
 - [x] **NEX-08**: Configure MassTransit and RabbitMQ in the backend.
-- **NEX-09**: Create the Github Webhook ingest controller.
-- **NEX-10**: Implement the `ProcessGithubWebhookCommand` as a background worker.
-- **NEX-11**: Build the frontend Engineering Timeline view.
+- [x] **NEX-09**: Create the Github Webhook ingest controller.
+- [x] **NEX-10**: Implement the `ProcessGithubWebhookCommand` as a background worker.
+- [ ] **NEX-11**: Build the frontend Engineering Timeline view.
 
 ## EPIC-04: AI-Assisted Insights
 **Goal**: Integrate the Gemini API to provide automated value on top of engineering data.
