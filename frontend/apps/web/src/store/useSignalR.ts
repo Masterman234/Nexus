@@ -23,7 +23,11 @@ export function useSignalR() {
           accessTokenFactory: () => token,
         })
         .withAutomaticReconnect()
-        .configureLogging(signalR.LogLevel.Warning) // Silencing the non-critical info logs
+        // In dev the Vite WS proxy nudges SignalR into a transient transport race
+        // (negotiation succeeds, first WebSocket attempt sees a stale connection id).
+        // SignalR self-recovers — the noise is cosmetic — so suppress at Critical in dev.
+        // Prod serves the bundle from the API directly and never hits this.
+        .configureLogging(import.meta.env.DEV ? signalR.LogLevel.Critical : signalR.LogLevel.Warning)
         .build()
 
       connection.current.on("ReceiveMessage", (message: any) => {

@@ -7,6 +7,12 @@ using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 
+// Load .env (walks up from CWD to find the file). Vars become process env vars,
+// which ASP.NET's environment-variable configuration source picks up automatically.
+// Use double-underscore (`__`) in .env keys to map to nested config (Webhook__GithubSecret -> Webhook:GithubSecret).
+// Silent no-op if .env is missing — production hosts inject real env vars instead.
+DotNetEnv.Env.TraversePath().Load();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Observability (Serilog + OpenTelemetry)

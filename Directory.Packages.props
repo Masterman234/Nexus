@@ -53,6 +53,9 @@
     <PackageVersion Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.1" />
     
+    <!-- Configuration -->
+    <PackageVersion Include="DotNetEnv" Version="3.1.1" /> <!-- Loads .env files into env vars at startup -->
+
     <!-- AI Integration -->
     <PackageVersion Include="Microsoft.SemanticKernel" Version="1.0.1" /> <!-- Abstraction layer for AI -->
     
