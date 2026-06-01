@@ -7,13 +7,16 @@ import { ChannelList } from "./ChannelList"
 import { MessageList } from "./MessageList"
 import { ChatInput } from "./ChatInput"
 import { Button } from "@/components/ui/button"
-import { LogOut, LayoutDashboard, Settings, User } from "lucide-react"
+import { LogOut, LayoutDashboard, Settings, User, MessageSquare, Activity } from "lucide-react"
 import { WorkspaceSelector } from "./WorkspaceSelector"
 import { useSignalR } from "@/store/useSignalR"
+import { EngineeringTimeline } from "@/features/engineering/EngineeringTimeline"
+import { useState } from "react"
 
 export function ChatContainer() {
   const { setChannels, setActiveChannel, activeChannel, channels } = useChatStore()
   const { user, logout } = useAuthStore()
+  const [view, setView] = useState<"chat" | "engineering">("chat")
 
   // Initialize SignalR connection
   useSignalR()
@@ -58,6 +61,25 @@ export function ChatContainer() {
           <h1 className="font-bold tracking-tight text-lg">Nexus</h1>
           <nav className="flex items-center ml-4 gap-1 text-sm font-medium">
             <WorkspaceSelector />
+            <div className="h-4 w-[1px] bg-border mx-2" />
+            <Button 
+              variant={view === "chat" ? "secondary" : "ghost"} 
+              size="sm" 
+              className="gap-2"
+              onClick={() => setView("chat")}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Chat
+            </Button>
+            <Button 
+              variant={view === "engineering" ? "secondary" : "ghost"} 
+              size="sm" 
+              className="gap-2"
+              onClick={() => setView("engineering")}
+            >
+              <Activity className="h-4 w-4" />
+              Engineering
+            </Button>
           </nav>
         </div>
         
@@ -76,9 +98,11 @@ export function ChatContainer() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <ChannelList />
+        {view === "chat" && <ChannelList />}
         <main className="flex-1 flex flex-col relative bg-background">
-          {activeChannel ? (
+          {view === "engineering" ? (
+            <EngineeringTimeline />
+          ) : activeChannel ? (
             <>
               <div className="h-12 border-b flex items-center px-4 justify-between bg-card/50">
                 <div className="flex items-center gap-2 font-semibold">

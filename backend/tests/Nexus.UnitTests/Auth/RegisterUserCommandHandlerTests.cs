@@ -3,6 +3,7 @@ using Moq;
 using Xunit;
 using Nexus.Application.Abstractions;
 using Nexus.Application.Auth.Commands.Register;
+using Nexus.Application.Auth.IntegrationEvents;
 using Nexus.Domain.Entities;
 using MassTransit;
 
@@ -45,7 +46,7 @@ public class RegisterUserCommandHandlerTests : TestBase
         DbContext.Users.Should().ContainSingle(u => u.Email == command.Email);
         
         _publishEndpointMock.Verify(
-            x => x.Publish(It.IsAny<object>(), It.IsAny<CancellationToken>()),
+            x => x.Publish(It.IsAny<UserCreatedIntegrationEvent>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

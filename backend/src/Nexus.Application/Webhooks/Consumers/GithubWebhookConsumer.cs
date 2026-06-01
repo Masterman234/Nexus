@@ -24,6 +24,9 @@ public class GithubWebhookConsumer(
 
         Console.WriteLine($">>> [BOT] Consumer Start: {@event.EventType}");
 
+        // NEX-15: Populate domain entities so the data is queryable, not just JSON.
+        await ProcessEntitiesAsync(@event.EventType, @event.Payload, ct);
+
         var displayMessage = BuildDisplayMessage(@event.EventType, @event.Payload);
 
         // Resolve target channel from config so we don't accidentally fan out to every
@@ -49,6 +52,106 @@ public class GithubWebhookConsumer(
             SystemUsers.GithubBotUsername,
             targetChannelId.Value,
             message.SentAt), ct);
+    }
+
+    private async Task ProcessEntitiesAsync(string eventType, string payload, CancellationToken ct)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            var root = doc.RootElement;
+
+            if (string.Equals(eventType, "push", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandlePushEntitiesAsync(root, ct);
+            }
+            else if (string.Equals(eventType, "pull_request", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandlePullRequestEntitiesAsync(root, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($">>> [BOT] Entity Process Error: {ex.Message}");
+        }
+    }
+
+    private async Task HandlePushEntitiesAsync(JsonElement root, CancellationToken ct)
+    {
+        if (!root.TryGetProperty("repository", out var repoProp)) return;
+        string repoName = repoProp.GetProperty("full_name").GetString() ?? "unknown";
+        
+        if (root.TryGetProperty("commits", out var commitsProp) && commitsProp.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var commitElement in commitsProp.EnumerateArray())
+            {
+                string? sha = commitElement.GetProperty("id").GetString();
+                if (sha is null) continue;
+                
+                // Avoid duplicates if redelivered
+                if (await dbContext.Commits.AnyAsync(c => c.Sha == sha, ct)) continue;
+
+                var commit = Commit.Create(
+                    sha,
+                    commitElement.GetProperty("message").GetString() ?? "",
+                    commitElement.GetProperty("author").GetProperty("name").GetString() ?? "Unknown",
+                    commitElement.GetProperty("author").GetProperty("email").GetString() ?? "",
+                    repoName,
+                    commitElement.TryGetProperty("timestamp", out var ts) && ts.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow
+                );
+
+                dbContext.Commits.Add(commit);
+            }
+            await dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task HandlePullRequestEntitiesAsync(JsonElement root, CancellationToken ct)
+    {
+        if (!root.TryGetProperty("pull_request", out var prElement)) return;
+        
+        long externalId = prElement.GetProperty("id").GetInt64();
+        string repoName = root.TryGetProperty("repository", out var repoProp) 
+            ? repoProp.GetProperty("full_name").GetString() ?? "unknown"
+            : "unknown";
+
+        var existingPr = await dbContext.PullRequests.FirstOrDefaultAsync(pr => pr.ExternalId == externalId, ct);
+
+        string title = prElement.GetProperty("title").GetString() ?? "";
+        string description = prElement.TryGetProperty("body", out var body) ? body.GetString() ?? "" : "";
+        string state = prElement.GetProperty("state").GetString() ?? "open";
+        string url = prElement.GetProperty("html_url").GetString() ?? "";
+        string authorName = prElement.GetProperty("user").GetProperty("login").GetString() ?? "Unknown";
+        
+        DateTime createdAt = prElement.GetProperty("created_at").GetDateTime();
+        DateTime updatedAt = prElement.GetProperty("updated_at").GetDateTime();
+        DateTime? mergedAt = prElement.TryGetProperty("merged_at", out var ma) && ma.ValueKind != JsonValueKind.Null && ma.TryGetDateTime(out var mdt) 
+            ? mdt 
+            : null;
+
+        if (existingPr is null)
+        {
+            var pr = PullRequest.Create(
+                externalId,
+                prElement.GetProperty("number").GetInt32(),
+                title,
+                description,
+                state,
+                url,
+                repoName,
+                authorName,
+                createdAt,
+                updatedAt,
+                mergedAt);
+
+            dbContext.PullRequests.Add(pr);
+        }
+        else
+        {
+            existingPr.Update(title, description, state, updatedAt, mergedAt);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private async Task<Guid?> ResolveTargetChannelIdAsync(CancellationToken ct)

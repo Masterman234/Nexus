@@ -12,6 +12,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<ExternalEvent> ExternalEvents => Set<ExternalEvent>();
+    public DbSet<Commit> Commits => Set<Commit>();
+    public DbSet<PullRequest> PullRequests => Set<PullRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
