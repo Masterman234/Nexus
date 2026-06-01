@@ -133,19 +133,19 @@ export function ChatContainer() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden relative text-slate-400">
+      <div className="flex flex-1 overflow-hidden relative text-slate-400 min-h-0">
         {view === "chat" && <ChannelList />}
         
-        <main className="flex-1 flex flex-col relative bg-[#0F172A]">
+        <main className="flex-1 flex flex-col relative bg-[#0F172A] min-h-0">
           {/* Subtle Background Glow for Main Content */}
           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#06B6D4]/5 rounded-full blur-[120px] pointer-events-none z-0" />
           
-          <div className="flex flex-1 flex-col relative z-10">
+          <div className="flex flex-1 flex-col relative z-10 min-h-0">
             {view === "engineering" ? (
               <EngineeringTimeline />
             ) : activeChannel ? (
               <>
-                <div className="h-12 border-b border-[#334155]/30 flex items-center px-6 justify-between bg-[#0F172A]/50 backdrop-blur-sm">
+                <div className="h-12 border-b border-[#334155]/30 flex items-center px-6 justify-between bg-[#0F172A]/50 backdrop-blur-sm shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="h-5 w-5 rounded bg-[#06B6D4]/10 flex items-center justify-center">
                         <Hash className="h-3.5 w-3.5 text-[#06B6D4]" />
@@ -167,7 +167,7 @@ export function ChatContainer() {
                     </Button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                     <MessageList />
                     <ChatInput />
                 </div>
