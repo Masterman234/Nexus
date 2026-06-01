@@ -2,6 +2,31 @@
 
 This document outlines the high-level milestones for bringing Nexus from concept to production.
 
+## Vision
+
+**Nexus is an event-driven engineering intelligence platform.** The chat UI is a
+surface — the substance is a shared event spine (RabbitMQ + `ExternalEvent`)
+that ingests signals from every system a team uses (GitHub, observability,
+ticketing, chat) into one timeline.
+
+The competitive bet is that **AI agents reasoning across all of those sources at
+once** beat AI agents that only see one source. Slack's AI knows messages.
+Linear's AI knows tickets. Copilot knows code. None of them know all of them.
+Nexus's architecture is built to make that cross-context reasoning trivial.
+
+Concretely, this means feature work prioritises:
+
+- **Event ingestion adapters** over chat-feature parity with Slack
+- **Cross-context AI features** (standup synthesis, postmortem drafting,
+  smart cross-linking) over single-source AI features (summarise a thread)
+- **Structured domain models** for PRs/commits/incidents over storing raw payloads
+- **Read-model replay** from the event log over write-heavy bespoke endpoints
+
+When in doubt, the question is: *does this feature exploit cross-context data
+in a way a single-purpose tool cannot?* If yes, build it. If no, deprioritise.
+
+
+
 ## Milestone 1: Foundations & Infrastructure (Weeks 1-2)
 - [x] Repository setup (monorepo, build props, linting rules).
 - [x] Architecture documentation and ADRs.

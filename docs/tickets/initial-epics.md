@@ -27,3 +27,97 @@ The following epics form the initial product backlog for Nexus. They are designe
 - **NEX-12**: Implement Semantic Kernel abstraction layer in `Nexus.Infrastructure`.
 - **NEX-13**: Implement `GenerateIncidentSummaryCommand` (triggered via RabbitMQ when an incident occurs).
 - **NEX-14**: Build frontend AI chat window with Server-Sent Events (SSE) streaming support.
+
+---
+
+# Differentiator Epics
+
+The epics above ship the platform's plumbing. The epics below are what makes
+Nexus *interesting*. Each one explicitly exercises the cross-context event spine
+in a way a single-purpose Slack/Linear/Sentry competitor architecturally can't.
+
+## EPIC-05: AI Standup Generator (Tier S)
+**Goal**: Each user can ask Nexus "what did I do yesterday?" and get a synthesised
+standup pulled from PRs they touched, commits they authored, incidents they
+triaged, and chat threads they participated in.
+
+This is the canonical demo of the cross-context architecture — a single Gemini
+call ingests four data sources unified by `UserId` and timestamp.
+
+- **NEX-15**: Domain model for `Commit` and `PullRequest` entities; populate
+  from `GithubWebhookConsumer` so the data is queryable, not just JSON in
+  `ExternalEvent`.
+- **NEX-16**: `IUserActivityQuery` projection that returns a user's activity
+  across all contexts within a time window. SQL-level, not via AI.
+- **NEX-17**: `GenerateStandupCommand` MediatR handler — calls Semantic Kernel
+  with the activity projection as context, returns markdown.
+- **NEX-18**: `/standup` slash command in chat + a dashboard widget that runs
+  on schedule (Hangfire / cron) and posts each user's standup to a configured
+  channel.
+
+## EPIC-06: Postmortem Assistant (Tier S)
+**Goal**: When an incident is resolved, Nexus auto-drafts a postmortem from the
+chat thread during the incident window, the deploys/commits in that window,
+the PRs that touched the affected files, and the alert payload.
+
+This is the killer feature for SRE/DevOps audiences.
+
+- **NEX-19**: Domain model for `Incident` (status, severity, affected services,
+  start/end timestamps).
+- **NEX-20**: Ingest adapter for at least one alerting source (CloudWatch,
+  PagerDuty, or a mock JSON endpoint) → emit `IncidentCreated` /
+  `IncidentResolved` integration events.
+- **NEX-21**: `IncidentTimelineQuery` — given an incident, gather correlated
+  messages, commits, PRs by time window + service tag.
+- **NEX-22**: `DraftPostmortemCommand` handler — Semantic Kernel prompt that
+  outputs a structured markdown postmortem (Timeline, Root Cause, Impact,
+  Action Items).
+- **NEX-23**: Postmortem editor UI — drafted doc is the starting point; user
+  edits in-app, exports to GitHub Issue or markdown file.
+
+## EPIC-07: Smart Cross-Linking (Tier S)
+**Goal**: Surface the implicit graph in the event log — commit messages link to
+ticket IDs, PRs link to incidents touching the same files, incidents link to
+chat threads mentioning the same service.
+
+No literal graph DB; just SQL queries over the structured event spine. The UX
+is what sells the architecture.
+
+- **NEX-24**: Reference extractor — parse `NEX-\d+` / `#\d+` / `SEV-\d+` style
+  references out of commit messages, PR titles, chat messages on save.
+  Persist as a `EntityReference` join row.
+- **NEX-25**: Backfill job — run the extractor against the existing
+  `ExternalEvent` history.
+- **NEX-26**: "Related" sidebar on every entity view (PR, ticket, incident,
+  message) showing what else references it.
+
+---
+
+# Backlog (Tier A, no ticket numbers yet)
+
+Ship these after the Tier-S epics. Each one *demonstrates* a piece of
+distributed-systems literacy in a portfolio-readable way.
+
+- **Generic webhook adapter pattern.** Extract `IWebhookAdapter<TSource>` from
+  `GithubWebhookConsumer`. Add adapters for Stripe, AWS CloudWatch, Linear,
+  PagerDuty. Each is ~50 lines and proves the architecture extends.
+- **Cross-context search.** Postgres full-text search over messages + commits +
+  tickets + incidents. Single endpoint, faceted by source.
+- **Slash commands.** `/incident new`, `/deploy status`, `/standup`,
+  `/explain <sha>`. Each routes to a MediatR command; user-facing CQRS.
+- **Event replay.** `ExternalEvent` is already an event log — add a worker
+  that replays it to rebuild read models. Proves event-sourcing literacy.
+
+---
+
+# Explicitly out of scope
+
+Listed here so we don't waste cycles on Slack-parity features that don't
+differentiate:
+
+- Threading, voice channels, file uploads, mentions, themes, presence polish.
+  (Every chat app has these. They make the project look more "done" but don't
+  improve the architectural story.)
+- Multi-tenancy / org isolation. (Only worth the complexity if real users are
+  signing up.)
+- E2E encryption, plugin marketplace.

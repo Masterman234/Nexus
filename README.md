@@ -1,16 +1,39 @@
-# Nexus: AI-Powered Engineering Collaboration
+# Nexus: An Event-Driven Engineering Intelligence Platform
 
-Nexus is a production-grade, AI-assisted real-time engineering collaboration and observability platform. Designed for modern software teams, Nexus bridges the gap between code repositories, incident management, and real-time developer communication. 
+Slack knows your messages. Linear knows your tickets. GitHub Copilot knows your
+code. Sentry knows your errors. **None of them know all of them** — and that's
+the wall every team's AI assistant currently hits.
 
-This repository serves as a **portfolio-quality example** of cloud-native architecture, pragmatic DDD, and observability-first engineering.
+Nexus is an event-driven engineering intelligence platform built around a single
+thesis: an AI agent that can reason across PRs, incidents, tickets, and chat at
+once is qualitatively more useful than four single-source agents. The Slack-style
+chat UI is the surface; the real substance is a shared event spine (RabbitMQ +
+`ExternalEvent` audit log) that ingests signals from every system a team uses
+into one timeline an agent can query.
 
-## 🎯 Project Goals
+This repository serves as a **portfolio-quality example** of cloud-native
+distributed architecture, pragmatic DDD, and observability-first engineering.
 
-- **Production-Grade Architecture**: Pragmatic Domain-Driven Design (DDD), Clean Architecture, and CQRS patterns.
-- **Observability-First**: Built with OpenTelemetry, Serilog, and centralized distributed tracing from Day 1.
-- **Scalable Real-time**: Robust async messaging and WebSocket-based event streaming using RabbitMQ and SignalR.
-- **AI-Assisted Workflows**: Seamless integration with the Gemini API for incident summaries, code explanations, and engineering assistance.
-- **Educational Value**: Meticulously documented tradeoffs, Architectural Decision Records (ADRs), and deep-dive engineering strategies.
+## 🎯 What makes it different
+
+- **Cross-context AI reasoning.** Features like the [AI Standup Generator](./docs/tickets/initial-epics.md#epic-05-ai-standup-generator-tier-s)
+  and [Postmortem Assistant](./docs/tickets/initial-epics.md#epic-06-postmortem-assistant-tier-s)
+  query PRs + commits + incidents + chat in one Semantic Kernel call, surfacing
+  insights a single-source tool architecturally cannot produce.
+- **Event-spine architecture.** GitHub webhooks land in `ExternalEvent`, get
+  published as integration events on RabbitMQ, and fan out to consumers in each
+  bounded context. The pattern extends to any source — Stripe, CloudWatch,
+  PagerDuty — with one adapter per provider.
+- **Domain-Driven Design done pragmatically.** Clean Architecture layers,
+  bounded contexts (Collaboration, Engineering, Observability, AI), CQRS via
+  MediatR, integration events between contexts.
+- **Observability-first.** OpenTelemetry tracing across context boundaries from
+  Day 1 — you can follow a `git push` from webhook arrival through RabbitMQ to
+  SignalR broadcast in one trace.
+- **Real-time on a backplane.** SignalR + Redis backplane, so the system
+  horizontally scales without losing message ordering inside a channel.
+- **Documented tradeoffs.** [Architecture Decision Records (ADRs)](./docs/adrs/)
+  explain why each pattern was chosen — not just what was built.
 
 ---
 
@@ -65,7 +88,28 @@ Nexus is built like a real engineering startup. All critical decisions, structur
 
 1. **[Architecture Docs](./docs/architecture/)**: Deep dives into our DDD approach, event-driven messaging, and AI strategies.
 2. **[Architecture Decision Records (ADRs)](./docs/adrs/)**: Historical context for "WHY" specific technologies and patterns were chosen.
-3. **[Engineering Tickets](./docs/tickets/)**: The initial backlog formatted as actionable engineering epics.
+3. **[Engineering Tickets](./docs/tickets/initial-epics.md)**: Initial scaffolding epics plus the [differentiator epics](./docs/tickets/initial-epics.md#differentiator-epics) (AI Standup, Postmortem Assistant, Smart Cross-Linking) that exercise the cross-context architecture.
+4. **[Roadmap & Vision](./docs/progress/roadmap.md)**: Milestones, the cross-context AI bet, and what's explicitly out of scope.
+5. **[GitHub Webhook Setup](./docs/webhooks-github.md)**: End-to-end guide for the GitHub integration — ngrok tunnel, HMAC verification, config wiring.
+
+## 📊 Status
+
+**Shipped** (foundations + ingestion spine):
+- Identity & JWT auth, workspaces, channels
+- Real-time chat (SignalR + Redis backplane), persisted history
+- RabbitMQ + MassTransit message bus
+- **GitHub webhook ingestion** — HMAC-verified, raw-body preserving, `ExternalEvent` audit log, RabbitMQ-backed consumer broadcasting to chat
+- OpenTelemetry tracing, Serilog structured logging, health checks
+- Clean Architecture layering (Domain / Application / Infrastructure / Api) enforced via NetArchTest
+
+**In progress** (Engineering Context domain modelling):
+- Frontend Engineering Timeline view (NEX-11)
+- `Commit` / `PullRequest` domain entities populated from webhook payloads (NEX-15)
+
+**Next** (the differentiator features):
+- AI Standup Generator (EPIC-05) — single Semantic Kernel call across PRs, commits, incidents, chat
+- Postmortem Assistant (EPIC-06) — auto-draft from correlated chat + deploys + alerts
+- Smart Cross-Linking (EPIC-07) — implicit graph over the event log
 
 ## 🚀 Quick Start (Local Development)
 
