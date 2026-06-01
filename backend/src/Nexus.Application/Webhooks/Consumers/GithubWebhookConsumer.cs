@@ -67,9 +67,11 @@ public class GithubWebhookConsumer(
 
         // Legacy fallback for first-run dev: pick the OLDEST channel named 'general'.
         // Logging this loudly so misconfig in prod doesn't go unnoticed.
+        // Channels are seeded in UserCreatedConsumer with the literal lowercase
+        // string "general", so an exact match is correct (and SQL-translatable).
         Console.WriteLine(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest channel named 'general'.");
         var fallback = await dbContext.Channels
-            .Where(c => c.Name.ToLower() == "general")
+            .Where(c => c.Name == "general")
             .OrderBy(c => c.CreatedAt)
             .Select(c => (Guid?)c.Id)
             .FirstOrDefaultAsync(ct);
