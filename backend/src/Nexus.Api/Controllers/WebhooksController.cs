@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Nexus.Application.Webhooks.Commands.HandleGithubWebhook;
 
 namespace Nexus.Api.Controllers;
@@ -15,7 +15,10 @@ namespace Nexus.Api.Controllers;
 // {version:apiVersion} segment is harmless from GitHub's perspective. To evolve the
 // payload contract later, ship a sibling controller with [ApiVersion("2.0")].
 [Route("api/v{version:apiVersion}/webhooks")]
-public class WebhooksController(ISender sender, IConfiguration configuration) : ControllerBase
+public class WebhooksController(
+    ISender sender, 
+    IConfiguration configuration,
+    ILogger<WebhooksController> logger) : ControllerBase
 {
     private const string SignatureHeader = "X-Hub-Signature-256";
     private const string EventHeader = "X-GitHub-Event";
@@ -42,7 +45,7 @@ public class WebhooksController(ISender sender, IConfiguration configuration) : 
         var eventType = Request.Headers[EventHeader].ToString();
         var deliveryId = Request.Headers[DeliveryHeader].ToString();
 
-        Console.WriteLine($">>> [API] Received Webhook! Event: {eventType} Delivery: {deliveryId}");
+        logger.LogInformation(">>> [API] Received Webhook! Event: {EventType} Delivery: {DeliveryId}", eventType, deliveryId);
 
         var configuredSecret = configuration["Webhook:GithubSecret"];
         if (!string.IsNullOrWhiteSpace(configuredSecret))
@@ -50,20 +53,20 @@ public class WebhooksController(ISender sender, IConfiguration configuration) : 
             var providedSignature = Request.Headers[SignatureHeader].ToString();
             if (string.IsNullOrWhiteSpace(providedSignature))
             {
-                Console.WriteLine(">>> [API] WARN: signature header missing while secret is configured.");
+                logger.LogWarning(">>> [API] signature header missing while secret is configured.");
                 return Unauthorized(new { message = "Missing signature." });
             }
 
             if (!IsValidGithubSignature(rawBody, configuredSecret, providedSignature))
             {
-                Console.WriteLine(">>> [API] WARN: signature mismatch.");
+                logger.LogWarning(">>> [API] signature mismatch.");
                 return Unauthorized(new { message = "Invalid signature." });
             }
         }
         else
         {
             // No secret configured → treat as dev-mode. Loud log so this never sneaks into prod silently.
-            Console.WriteLine(">>> [API] WARN: Webhook:GithubSecret is not configured. Skipping signature check (DEV ONLY).");
+            logger.LogWarning(">>> [API] Webhook:GithubSecret is not configured. Skipping signature check (DEV ONLY).");
         }
 
         var actualEvent = string.IsNullOrWhiteSpace(eventType) ? "push" : eventType;

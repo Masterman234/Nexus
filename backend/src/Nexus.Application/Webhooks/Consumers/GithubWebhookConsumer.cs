@@ -1,6 +1,7 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Nexus.Application.Abstractions;
 using Nexus.Application.Channels;
 using Nexus.Application.Webhooks.IntegrationEvents;
@@ -12,7 +13,8 @@ namespace Nexus.Application.Webhooks.Consumers;
 public class GithubWebhookConsumer(
     IApplicationDbContext dbContext,
     IChatService chatService,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ILogger<GithubWebhookConsumer> logger)
     : IConsumer<GithubWebhookReceivedIntegrationEvent>
 {
     private const string DefaultPrMessage = "⚓ Pull Request activity on GitHub!";
@@ -22,7 +24,7 @@ public class GithubWebhookConsumer(
         var @event = context.Message;
         var ct = context.CancellationToken;
 
-        Console.WriteLine($">>> [BOT] Consumer Start: {@event.EventType}");
+        logger.LogInformation(">>> [BOT] Consumer Start: {EventType}", @event.EventType);
 
         // NEX-15: Populate domain entities so the data is queryable, not just JSON.
         await ProcessEntitiesAsync(@event.EventType, @event.Payload, ct);
@@ -45,7 +47,7 @@ public class GithubWebhookConsumer(
         dbContext.Messages.Add(message);
         await dbContext.SaveChangesAsync(ct);
 
-        Console.WriteLine($">>> [BOT] Broadcasting to UI channel={targetChannelId} id={message.Id}");
+        logger.LogInformation(">>> [BOT] Broadcasting to UI channel={TargetChannelId} id={MessageId}", targetChannelId, message.Id);
         await chatService.BroadcastMessageAsync(targetChannelId.Value, new MessageResponse(
             message.Id,
             message.Content,
@@ -58,6 +60,7 @@ public class GithubWebhookConsumer(
     {
         try
         {
+            logger.LogInformation(">>> [BOT] Parsing payload for entities. Event: {EventType}", eventType);
             using var doc = JsonDocument.Parse(payload);
             var root = doc.RootElement;
 
@@ -69,27 +72,45 @@ public class GithubWebhookConsumer(
             {
                 await HandlePullRequestEntitiesAsync(root, ct);
             }
+            else
+            {
+                logger.LogWarning(">>> [BOT] Unhandled event type for entities: {EventType}", eventType);
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($">>> [BOT] Entity Process Error: {ex.Message}");
+            logger.LogError(ex, ">>> [BOT] Entity Process Error: {Message}", ex.Message);
         }
     }
 
     private async Task HandlePushEntitiesAsync(JsonElement root, CancellationToken ct)
     {
-        if (!root.TryGetProperty("repository", out var repoProp)) return;
+        if (!root.TryGetProperty("repository", out var repoProp)) 
+        {
+            logger.LogWarning(">>> [BOT] No repository property found in push payload.");
+            return;
+        }
+
         string repoName = repoProp.GetProperty("full_name").GetString() ?? "unknown";
+        logger.LogInformation(">>> [BOT] Processing push for repo: {RepoName}", repoName);
         
         if (root.TryGetProperty("commits", out var commitsProp) && commitsProp.ValueKind == JsonValueKind.Array)
         {
+            int count = 0;
             foreach (var commitElement in commitsProp.EnumerateArray())
             {
                 string? sha = commitElement.GetProperty("id").GetString();
-                if (sha is null) continue;
+                if (sha is null) 
+                {
+                    logger.LogWarning(">>> [BOT] Commit ID is null, skipping.");
+                    continue;
+                }
                 
-                // Avoid duplicates if redelivered
-                if (await dbContext.Commits.AnyAsync(c => c.Sha == sha, ct)) continue;
+                if (await dbContext.Commits.AnyAsync(c => c.Sha == sha, ct)) 
+                {
+                    logger.LogInformation(">>> [BOT] Commit {Sha} already exists, skipping.", sha.Substring(0, 7));
+                    continue;
+                }
 
                 var commit = Commit.Create(
                     sha,
@@ -101,19 +122,39 @@ public class GithubWebhookConsumer(
                 );
 
                 dbContext.Commits.Add(commit);
+                count++;
             }
-            await dbContext.SaveChangesAsync(ct);
+            
+            if (count > 0)
+            {
+                await dbContext.SaveChangesAsync(ct);
+                logger.LogInformation(">>> [BOT] Saved {Count} new commits to DB.", count);
+            }
+            else
+            {
+                logger.LogInformation(">>> [BOT] No new commits to save.");
+            }
+        }
+        else
+        {
+            logger.LogWarning(">>> [BOT] No commits array found in push payload.");
         }
     }
 
     private async Task HandlePullRequestEntitiesAsync(JsonElement root, CancellationToken ct)
     {
-        if (!root.TryGetProperty("pull_request", out var prElement)) return;
+        if (!root.TryGetProperty("pull_request", out var prElement)) 
+        {
+            logger.LogWarning(">>> [BOT] No pull_request property found in payload.");
+            return;
+        }
         
         long externalId = prElement.GetProperty("id").GetInt64();
         string repoName = root.TryGetProperty("repository", out var repoProp) 
             ? repoProp.GetProperty("full_name").GetString() ?? "unknown"
             : "unknown";
+
+        logger.LogInformation(">>> [BOT] Processing PR {ExternalId} for repo: {RepoName}", externalId, repoName);
 
         var existingPr = await dbContext.PullRequests.FirstOrDefaultAsync(pr => pr.ExternalId == externalId, ct);
 
@@ -131,6 +172,7 @@ public class GithubWebhookConsumer(
 
         if (existingPr is null)
         {
+            logger.LogInformation(">>> [BOT] Creating new PR entity: {Title}", title);
             var pr = PullRequest.Create(
                 externalId,
                 prElement.GetProperty("number").GetInt32(),
@@ -148,10 +190,12 @@ public class GithubWebhookConsumer(
         }
         else
         {
+            logger.LogInformation(">>> [BOT] Updating existing PR entity: {Title}", title);
             existingPr.Update(title, description, state, updatedAt, mergedAt);
         }
 
         await dbContext.SaveChangesAsync(ct);
+        logger.LogInformation(">>> [BOT] PR saved to DB.");
     }
 
     private async Task<Guid?> ResolveTargetChannelIdAsync(CancellationToken ct)
@@ -162,7 +206,7 @@ public class GithubWebhookConsumer(
             var exists = await dbContext.Channels.AnyAsync(c => c.Id == parsed, ct);
             if (!exists)
             {
-                Console.WriteLine($">>> [BOT] ERROR: Webhook:GithubTargetChannelId is set to {parsed} but no channel with that id exists.");
+                logger.LogError(">>> [BOT] ERROR: Webhook:GithubTargetChannelId is set to {Parsed} but no channel with that id exists.", parsed);
                 return null;
             }
             return parsed;
@@ -172,7 +216,7 @@ public class GithubWebhookConsumer(
         // Logging this loudly so misconfig in prod doesn't go unnoticed.
         // Channels are seeded in UserCreatedConsumer with the literal lowercase
         // string "general", so an exact match is correct (and SQL-translatable).
-        Console.WriteLine(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest channel named 'general'.");
+        logger.LogWarning(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest channel named 'general'.");
         var fallback = await dbContext.Channels
             .Where(c => c.Name == "general")
             .OrderBy(c => c.CreatedAt)
@@ -181,7 +225,7 @@ public class GithubWebhookConsumer(
 
         if (fallback is null)
         {
-            Console.WriteLine(">>> [BOT] ERROR: No channel named 'general' found in DB.");
+            logger.LogError(">>> [BOT] ERROR: No channel named 'general' found in DB.");
         }
         return fallback;
     }

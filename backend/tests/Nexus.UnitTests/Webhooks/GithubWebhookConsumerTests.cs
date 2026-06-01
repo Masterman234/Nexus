@@ -2,6 +2,7 @@ using FluentAssertions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Nexus.Application.Abstractions;
 using Nexus.Application.Channels;
@@ -16,13 +17,19 @@ public class GithubWebhookConsumerTests : TestBase
 {
     private readonly Mock<IChatService> _chatServiceMock;
     private readonly Mock<IConfiguration> _configurationMock;
+    private readonly Mock<ILogger<GithubWebhookConsumer>> _loggerMock;
     private readonly GithubWebhookConsumer _consumer;
 
     public GithubWebhookConsumerTests()
     {
         _chatServiceMock = new Mock<IChatService>();
         _configurationMock = new Mock<IConfiguration>();
-        _consumer = new GithubWebhookConsumer(DbContext, _chatServiceMock.Object, _configurationMock.Object);
+        _loggerMock = new Mock<ILogger<GithubWebhookConsumer>>();
+        _consumer = new GithubWebhookConsumer(
+            DbContext, 
+            _chatServiceMock.Object, 
+            _configurationMock.Object,
+            _loggerMock.Object);
     }
 
     [Fact]
