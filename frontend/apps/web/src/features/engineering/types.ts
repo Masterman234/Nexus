@@ -5,6 +5,7 @@ export interface Commit {
   authorName: string;
   authorEmail: string;
   repositoryName: string;
+  url: string;
   committedAt: string;
 }
 

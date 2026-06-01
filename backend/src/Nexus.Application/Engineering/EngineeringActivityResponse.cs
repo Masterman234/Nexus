@@ -11,6 +11,7 @@ public record CommitResponse(
     string AuthorName,
     string AuthorEmail,
     string RepositoryName,
+    string Url,
     DateTime CommittedAt);
 
 public record PullRequestResponse(

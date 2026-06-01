@@ -24,6 +24,7 @@ public static class GetEngineeringActivity
                     c.AuthorName,
                     c.AuthorEmail,
                     c.RepositoryName,
+                    $"https://github.com/{c.RepositoryName}/commit/{c.Sha}",
                     c.CommittedAt))
                 .ToListAsync(cancellationToken);
 

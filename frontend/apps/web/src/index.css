@@ -4,83 +4,35 @@
 
 @layer base {
   :root {
-    /* OPTION A: "The Dev Tool" (Light Mode) */
-    /* Stark white background, pure black text for maximum contrast */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
-
-    /* Pure white cards with subtle borders */
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-
-    /* Primary actions are pure black */
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-
-    /* Secondary/Muted are very light grays */
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-
-    /* Standard red for destructive actions */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    /* Very subtle borders */
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
     
-    /* Focus rings use a subdued blue to indicate interaction without being loud */
-    --ring: 212 100% 48%;
-
-    /* 0.5rem radius keeps it professional but not overly sharp */
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    /* OPTION A: "The Dev Tool" (Dark Mode) */
-    /* Very dark gray (almost black) background, off-white text */
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-
-    /* Cards are slightly lighter than the background to stand out */
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
-    /* Primary actions are pure white in dark mode */
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-
-    /* Secondary/Muted are darker grays */
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    /* Darker borders for subtle separation */
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
+    --card: 217 33% 17%;
+    --card-foreground: 210 40% 98%;
     
-    /* Focus rings use a subdued blue */
-    --ring: 212 100% 48%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    
+    --primary: 188 86% 43%;
+    --primary-foreground: 210 40% 98%;
+    
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 215 20% 77%;
+    
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 77%;
+    
+    --accent: 188 86% 43%;
+    --accent-foreground: 210 40% 98%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 217 19% 27%;
+    --input: 217 19% 27%;
+    --ring: 188 86% 43%;
+    
+    --radius: 0.75rem;
   }
 }
 
@@ -89,6 +41,13 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 }
