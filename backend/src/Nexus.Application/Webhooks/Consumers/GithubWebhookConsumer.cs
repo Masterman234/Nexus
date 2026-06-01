@@ -217,7 +217,6 @@ public class GithubWebhookConsumer(
         logger.LogWarning(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest 'general' channel.");
         
         var fallback = await dbContext.Channels
-            .Include(c => c.WorkspaceId) // We can't include Workspace easily without a navigation property
             .Where(c => c.Name == "general")
             .OrderBy(c => c.CreatedAt)
             .Select(c => new { c.Id, c.Name })
@@ -233,7 +232,7 @@ public class GithubWebhookConsumer(
         return fallback.Id;
     }
 
-    private static string BuildDisplayMessage(string eventType, string payload)
+    private string BuildDisplayMessage(string eventType, string payload)
     {
         if (string.Equals(eventType, "push", StringComparison.OrdinalIgnoreCase))
         {
@@ -246,7 +245,7 @@ public class GithubWebhookConsumer(
         return $"⚡ GitHub Event Received: {eventType}";
     }
 
-    private static string ParsePushEvent(string json)
+    private string ParsePushEvent(string json)
     {
         try
         {
@@ -258,17 +257,39 @@ public class GithubWebhookConsumer(
             string repoName = GetPropertyValue(root, "repository", "full_name") ?? "Nexus-Platform";
             string pusherName = GetPropertyValue(root, "pusher", "name") ?? "A Developer";
 
-            int commits = 0;
+            var commitMsgs = new List<string>();
             if (root.TryGetProperty("commits", out var commitProp) && commitProp.ValueKind == JsonValueKind.Array)
             {
-                commits = commitProp.GetArrayLength();
+                foreach (var c in commitProp.EnumerateArray())
+                {
+                    var msg = c.TryGetProperty("message", out var m) ? m.GetString() : null;
+                    if (!string.IsNullOrWhiteSpace(msg))
+                    {
+                        // Take first line and truncate if very long
+                        var firstLine = msg.Split('\n')[0];
+                        if (firstLine.Length > 80) firstLine = firstLine.Substring(0, 77) + "...";
+                        commitMsgs.Add($"> `{firstLine}`");
+                    }
+                }
             }
 
-            return $"🚀 **{pusherName}** just pushed {commits} commit(s) to `{repoName}`";
+            var summary = $"🚀 **{pusherName}** just pushed {commitMsgs.Count} commit(s) to `{repoName}`";
+            
+            if (commitMsgs.Count > 0)
+            {
+                // Only show first 3 commits to avoid spamming
+                var displayCommits = commitMsgs.Take(3).ToList();
+                var list = string.Join("\n", displayCommits);
+                if (commitMsgs.Count > 3) list += $"\n> ... and {commitMsgs.Count - 3} more";
+                
+                return $"{summary}\n\n{list}";
+            }
+
+            return summary;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($">>> [BOT] Parse Warning: {ex.Message}");
+            logger.LogWarning(ex, ">>> [BOT] Parse Warning in ParsePushEvent: {Message}", ex.Message);
             return "🚀 New code pushed to GitHub!";
         }
     }
