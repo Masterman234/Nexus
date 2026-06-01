@@ -118,7 +118,7 @@ public class GithubWebhookConsumer(
                     commitElement.GetProperty("author").GetProperty("name").GetString() ?? "Unknown",
                     commitElement.GetProperty("author").GetProperty("email").GetString() ?? "",
                     repoName,
-                    commitElement.TryGetProperty("timestamp", out var ts) && ts.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow
+                    commitElement.TryGetProperty("timestamp", out var ts) && ts.TryGetDateTime(out var dt) ? dt.ToUniversalTime() : DateTime.UtcNow
                 );
 
                 dbContext.Commits.Add(commit);
@@ -164,10 +164,10 @@ public class GithubWebhookConsumer(
         string url = prElement.GetProperty("html_url").GetString() ?? "";
         string authorName = prElement.GetProperty("user").GetProperty("login").GetString() ?? "Unknown";
         
-        DateTime createdAt = prElement.GetProperty("created_at").GetDateTime();
-        DateTime updatedAt = prElement.GetProperty("updated_at").GetDateTime();
+        DateTime createdAt = prElement.GetProperty("created_at").GetDateTime().ToUniversalTime();
+        DateTime updatedAt = prElement.GetProperty("updated_at").GetDateTime().ToUniversalTime();
         DateTime? mergedAt = prElement.TryGetProperty("merged_at", out var ma) && ma.ValueKind != JsonValueKind.Null && ma.TryGetDateTime(out var mdt) 
-            ? mdt 
+            ? mdt.ToUniversalTime() 
             : null;
 
         if (existingPr is null)
