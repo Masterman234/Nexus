@@ -1,5 +1,6 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Nexus.Application.Abstractions;
 using Nexus.Application.Channels;
 using Nexus.Application.Webhooks.IntegrationEvents;
@@ -10,7 +11,8 @@ namespace Nexus.Application.Webhooks.Consumers;
 
 public class GithubWebhookConsumer(
     IApplicationDbContext dbContext,
-    IChatService chatService)
+    IChatService chatService,
+    IConfiguration configuration)
     : IConsumer<GithubWebhookReceivedIntegrationEvent>
 {
     private const string DefaultPrMessage = "⚓ Pull Request activity on GitHub!";
@@ -24,50 +26,59 @@ public class GithubWebhookConsumer(
 
         var displayMessage = BuildDisplayMessage(@event.EventType, @event.Payload);
 
-        // Case-insensitive search for the 'general' channel.
-        var allChannels = await dbContext.Channels.ToListAsync(ct);
-        var targetChannelIds = allChannels
-            .Where(c => string.Equals(c.Name, "general", StringComparison.OrdinalIgnoreCase))
-            .Select(c => c.Id)
-            .ToList();
-
-        if (targetChannelIds.Count == 0)
+        // Resolve target channel from config so we don't accidentally fan out to every
+        // workspace's auto-created "general" channel. When unset (early dev), fall back
+        // to the legacy name-match behaviour and log a warning so misconfig is loud.
+        var targetChannelId = await ResolveTargetChannelIdAsync(ct);
+        if (targetChannelId is null)
         {
-            Console.WriteLine(">>> [BOT] ERROR: No channel named 'general' found in DB!");
-            return;
+            return; // ResolveTargetChannelIdAsync already logged the reason.
         }
 
-        // Persist each broadcast as a real Message row so history survives a reload
-        // and clients that weren't joined to the channel at delivery time still see
-        // it when they later open the channel. The github-bot system user is seeded
-        // by DatabaseInitializer; its FK is guaranteed to exist.
-        foreach (var channelId in targetChannelIds)
-        {
-            var message = Message.Create(displayMessage, SystemUsers.GithubBotId, channelId);
-            dbContext.Messages.Add(message);
-        }
-
+        // Persist as a real Message row so history survives a reload and clients that
+        // weren't joined to the channel at delivery time still see it on next open.
+        // The github-bot system user is seeded by DatabaseInitializer; FK is safe.
+        var message = Message.Create(displayMessage, SystemUsers.GithubBotId, targetChannelId.Value);
+        dbContext.Messages.Add(message);
         await dbContext.SaveChangesAsync(ct);
 
-        // Broadcast after persistence so the on-wire payload matches the DB row.
-        foreach (var channelId in targetChannelIds)
-        {
-            // Find the just-added message for this channel. We re-pull from the
-            // tracker rather than threading the entity out of the loop above so
-            // the broadcast id matches the persisted id exactly.
-            var persisted = await dbContext.Messages
-                .Where(m => m.ChannelId == channelId && m.UserId == SystemUsers.GithubBotId)
-                .OrderByDescending(m => m.SentAt)
-                .FirstAsync(ct);
+        Console.WriteLine($">>> [BOT] Broadcasting to UI channel={targetChannelId} id={message.Id}");
+        await chatService.BroadcastMessageAsync(targetChannelId.Value, new MessageResponse(
+            message.Id,
+            message.Content,
+            SystemUsers.GithubBotUsername,
+            targetChannelId.Value,
+            message.SentAt), ct);
+    }
 
-            Console.WriteLine($">>> [BOT] Broadcasting to UI channel={channelId} id={persisted.Id}");
-            await chatService.BroadcastMessageAsync(channelId, new MessageResponse(
-                persisted.Id,
-                persisted.Content,
-                SystemUsers.GithubBotUsername,
-                channelId,
-                persisted.SentAt), ct);
+    private async Task<Guid?> ResolveTargetChannelIdAsync(CancellationToken ct)
+    {
+        var configured = configuration["Webhook:GithubTargetChannelId"];
+        if (Guid.TryParse(configured, out var parsed))
+        {
+            var exists = await dbContext.Channels.AnyAsync(c => c.Id == parsed, ct);
+            if (!exists)
+            {
+                Console.WriteLine($">>> [BOT] ERROR: Webhook:GithubTargetChannelId is set to {parsed} but no channel with that id exists.");
+                return null;
+            }
+            return parsed;
         }
+
+        // Legacy fallback for first-run dev: pick the OLDEST channel named 'general'.
+        // Logging this loudly so misconfig in prod doesn't go unnoticed.
+        Console.WriteLine(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest channel named 'general'.");
+        var fallback = await dbContext.Channels
+            .Where(c => c.Name.ToLower() == "general")
+            .OrderBy(c => c.CreatedAt)
+            .Select(c => (Guid?)c.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (fallback is null)
+        {
+            Console.WriteLine(">>> [BOT] ERROR: No channel named 'general' found in DB.");
+        }
+        return fallback;
     }
 
     private static string BuildDisplayMessage(string eventType, string payload)
