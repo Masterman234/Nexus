@@ -24,7 +24,31 @@ export function MessageItem({ message, channelId }: MessageItemProps) {
   const isBot = message.username === "github-bot"
 
   const editMutation = useMutation({
-// ... rest of mutation logic ...
+    mutationFn: async () => {
+      const response = await api.patch(`/channels/messages/${message.id}`, {
+        content: editContent,
+        userId: user?.id,
+      })
+      return response.data
+    },
+    onSuccess: (data) => {
+      updateMessage(channelId, data)
+      setIsEditing(false)
+      setShowMenu(false)
+    },
+    onError: (err: any) => {
+      console.error("Edit Failed:", err.response?.data || err.message)
+      alert("Failed to edit message: " + (err.response?.data?.message || err.message))
+    }
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await api.delete(`/channels/messages/${message.id}?userId=${user?.id}`)
+    },
+    onSuccess: () => {
+      deleteMessage(channelId, message.id)
+      setShowMenu(false)
     },
     onError: (err: any) => {
       console.error("Delete Failed:", err.response?.data || err.message)
@@ -71,7 +95,43 @@ export function MessageItem({ message, channelId }: MessageItemProps) {
               <span className="text-[9px] px-1.5 py-0.5 bg-[#06B6D4]/10 text-[#06B6D4] border border-[#06B6D4]/20 rounded uppercase font-bold tracking-widest">System</span>
           )}
         </div>
-// ... rest of menu logic ...
+
+        {isMe && !isEditing && (
+          <div className="relative">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMenu(!showMenu)
+              }}
+              className="p-1 hover:bg-black/10 rounded transition-colors"
+            >
+              <MoreVertical className="h-3 w-3 text-slate-400" />
+            </button>
+            
+            {showMenu && (
+              <div className="absolute right-0 top-6 w-32 bg-slate-800 text-white border border-[#334155] shadow-xl rounded-xl p-1 z-[100] flex flex-col gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsEditing(true)
+                    setShowMenu(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-700 rounded-lg text-left transition-colors"
+                >
+                  <Pencil className="h-3 w-3" /> Edit
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    deleteMutation.mutate()
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-400/10 rounded-lg text-left transition-colors"
+                >
+                  <Trash2 className="h-3 w-3" /> Delete
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
