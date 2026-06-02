@@ -1,10 +1,30 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import api from "@/lib/api";
 import type { EngineeringActivity } from "./types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { GitCommit, GitPullRequest, Clock, ExternalLink, Filter, Plus, Activity, Search, Database, ArrowRight } from "lucide-react";
+import { 
+  GitCommit, 
+  GitPullRequest, 
+  Clock, 
+  ExternalLink, 
+  Filter, 
+  Activity, 
+  Search, 
+  Database, 
+  ArrowRight,
+  Sparkles,
+  Loader2
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function formatRelativeTime(date: Date) {
   const now = new Date();
@@ -17,6 +37,9 @@ function formatRelativeTime(date: Date) {
 }
 
 export function EngineeringTimeline() {
+  const [standup, setStandup] = useState<string | null>(null);
+  const [isStandupOpen, setIsStandupOpen] = useState(false);
+
   const { data, isLoading } = useQuery<EngineeringActivity>({
     queryKey: ["engineering-activity"],
     queryFn: async () => {
@@ -24,6 +47,17 @@ export function EngineeringTimeline() {
       return response.data;
     },
     refetchInterval: 15000,
+  });
+
+  const standupMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post("/engineering/standup");
+      return response.data.summary;
+    },
+    onSuccess: (summary) => {
+      setStandup(summary);
+      setIsStandupOpen(true);
+    },
   });
 
   if (isLoading) {
@@ -56,6 +90,26 @@ export function EngineeringTimeline() {
           </div>
           
           <div className="flex items-center gap-3">
+             <Button 
+                onClick={() => standupMutation.mutate()}
+                disabled={standupMutation.isPending || timelineItems.length === 0}
+                className="bg-[#06B6D4] hover:bg-[#0891B2] text-white font-bold rounded-xl px-6 gap-2 shadow-lg shadow-[#06B6D4]/20 transition-all"
+             >
+                {standupMutation.isPending ? (
+                    <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing...
+                    </>
+                ) : (
+                    <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate AI Standup
+                    </>
+                )}
+             </Button>
+
+             <div className="h-6 w-px bg-[#334155] mx-2" />
+
              <div className="flex bg-[#1E293B] p-1 rounded-xl border border-[#334155]">
                 <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-widest text-[#06B6D4] bg-[#06B6D4]/10 rounded-lg">
                     Live View
@@ -67,10 +121,6 @@ export function EngineeringTimeline() {
              <Button variant="outline" size="sm" className="h-10 border-[#334155] bg-transparent text-slate-400 hover:text-white rounded-xl px-4 gap-2 transition-all">
                 <Filter className="h-3.5 w-3.5" />
                 Filter
-             </Button>
-             <Button size="sm" className="h-10 bg-[#06B6D4] hover:bg-[#0891B2] text-white font-bold rounded-xl px-4 gap-2 shadow-lg shadow-[#06B6D4]/20 transition-all">
-                <Plus className="h-4 w-4" />
-                Integration
              </Button>
           </div>
         </div>
@@ -85,9 +135,13 @@ export function EngineeringTimeline() {
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Active PRs</p>
                 <h4 className="text-3xl font-bold text-white tracking-tight">{data?.pullRequests.length || 0}</h4>
             </div>
-            <div className="bg-[#1E293B]/40 border border-[#334155]/50 p-6 rounded-[1.5rem] backdrop-blur-sm">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Avg. Velocity</p>
-                <h4 className="text-3xl font-bold text-[#06B6D4] tracking-tight">4.2 <span className="text-sm font-medium text-slate-500">pts/d</span></h4>
+            <div className="bg-[#1E293B]/40 border border-[#334155]/50 p-6 rounded-[1.5rem] backdrop-blur-sm relative group cursor-pointer overflow-hidden">
+                <div className="absolute inset-0 bg-[#06B6D4]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">AI Health Signal</p>
+                <h4 className="text-3xl font-bold text-[#06B6D4] tracking-tight flex items-center gap-2">
+                    Optimal
+                    <div className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
+                </h4>
             </div>
         </div>
 
@@ -180,6 +234,48 @@ export function EngineeringTimeline() {
           )}
         </div>
       </div>
+
+      {/* AI Standup Dialog */}
+      <Dialog open={isStandupOpen} onOpenChange={setIsStandupOpen}>
+        <DialogContent className="max-w-2xl bg-[#1E293B] border-[#334155] text-white rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+                <div className="h-10 w-10 bg-[#06B6D4]/10 rounded-xl flex items-center justify-center">
+                    <Sparkles className="h-6 w-6 text-[#06B6D4]" />
+                </div>
+                Daily Standup Summary
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 font-medium">
+                AI-generated summary of your engineering activity in the last 24 hours.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-6 p-6 bg-[#0F172A] rounded-2xl border border-[#334155] max-h-[60vh] overflow-y-auto">
+            <div className="prose prose-invert prose-slate max-w-none">
+                {standup?.split('\n').map((line, i) => (
+                    <p key={i} className="text-slate-300 leading-relaxed text-sm mb-4 last:mb-0">
+                        {line}
+                    </p>
+                ))}
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3">
+             <Button variant="outline" onClick={() => setIsStandupOpen(false)} className="border-[#334155] text-slate-400 hover:text-white rounded-xl bg-transparent">
+                Close
+             </Button>
+             <Button 
+                onClick={() => {
+                    navigator.clipboard.writeText(standup || "");
+                    alert("Copied to clipboard!");
+                }}
+                className="bg-[#06B6D4] hover:bg-[#0891B2] text-white font-bold rounded-xl"
+             >
+                Copy to Clipboard
+             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

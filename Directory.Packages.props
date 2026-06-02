@@ -13,8 +13,8 @@
   <ItemGroup>
     <!-- Framework & Core -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
     <PackageVersion Include="Asp.Versioning.Http" Version="8.1.0" />
     <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
     <PackageVersion Include="AspNetCore.HealthChecks.NpgSql" Version="8.0.0" />
@@ -57,7 +57,8 @@
     <PackageVersion Include="DotNetEnv" Version="3.1.1" /> <!-- Loads .env files into env vars at startup -->
 
     <!-- AI Integration -->
-    <PackageVersion Include="Microsoft.SemanticKernel" Version="1.0.1" /> <!-- Abstraction layer for AI -->
+    <PackageVersion Include="Microsoft.SemanticKernel" Version="1.77.0" /> <!-- Abstraction layer for AI -->
+    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.Google" Version="1.77.0-alpha" /> <!-- Gemini support -->
     
     <!-- Analyzers (versions managed here, referenced in Directory.Build.props) -->
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="9.16.0.82469" />

@@ -10,12 +10,31 @@ using Nexus.Infrastructure.Services;
 using Nexus.Application.Auth.Consumers;
 using Nexus.Application.Webhooks.Consumers;
 
+using Microsoft.SemanticKernel;
+using Nexus.Infrastructure.AI;
+
 namespace Nexus.Infrastructure;
 
 public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        // AI - Semantic Kernel & Gemini
+        // Support both standard .NET mapping (Gemini__ApiKey) and direct env var (GEMINI_API_KEY)
+        var geminiApiKey = configuration["Gemini:ApiKey"] 
+            ?? configuration["GEMINI_API_KEY"] 
+            ?? string.Empty;
+
+        var geminiModelId = configuration["Gemini:ModelId"] ?? "gemini-1.5-pro";
+
+        #pragma warning disable SKEXP0070 
+        var kernelBuilder = Kernel.CreateBuilder()
+            .AddGoogleAIGeminiChatCompletion(geminiModelId, geminiApiKey);
+        #pragma warning restore SKEXP0070
+
+        services.AddScoped(sp => kernelBuilder.Build());
+        services.AddScoped<IAIService, AIService>();
+
         // Authentication
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtProvider, JwtProvider>();
