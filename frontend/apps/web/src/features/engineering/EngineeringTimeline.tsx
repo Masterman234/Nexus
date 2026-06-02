@@ -58,6 +58,10 @@ export function EngineeringTimeline() {
       setStandup(summary);
       setIsStandupOpen(true);
     },
+    onError: (error: any) => {
+      console.error("AI Standup Failed:", error.response?.data || error.message);
+      alert("AI Standup Failed: " + (error.response?.data?.message || error.message || "Unknown error"));
+    }
   });
 
   if (isLoading) {
