@@ -20,6 +20,10 @@ public class EngineeringController(ISender sender) : ControllerBase
     public async Task<IActionResult> GenerateStandup([FromQuery] string? authorName)
     {
         var result = await sender.Send(new GenerateStandup.Command(authorName));
-        return result.IsSuccess ? Ok(new { summary = result.Value }) : BadRequest(result.Error);
+        // Return error as `{ message }` so the frontend can read response.data.message
+        // (matches what EngineeringTimeline.tsx already expects in its onError handler).
+        return result.IsSuccess
+            ? Ok(new { summary = result.Value })
+            : BadRequest(new { message = result.Error });
     }
 }
