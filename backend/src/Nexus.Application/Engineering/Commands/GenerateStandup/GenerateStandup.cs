@@ -15,11 +15,12 @@ public static class GenerateStandup
     {
         public async Task<Result<string>> Handle(Command request, CancellationToken cancellationToken)
         {
-            var yesterday = DateTime.UtcNow.AddDays(-1);
+            // Expand to 48 hours to ensure recent activity is captured even across timezones
+            var lookback = DateTime.UtcNow.AddDays(-2);
 
             // 1. Fetch recent commits
             var commitsQuery = dbContext.Commits
-                .Where(c => c.CommittedAt >= yesterday);
+                .Where(c => c.CommittedAt >= lookback);
 
             if (!string.IsNullOrWhiteSpace(request.AuthorName))
             {
@@ -33,7 +34,7 @@ public static class GenerateStandup
 
             // 2. Fetch recent PRs
             var prsQuery = dbContext.PullRequests
-                .Where(pr => pr.UpdatedAt >= yesterday);
+                .Where(pr => pr.UpdatedAt >= lookback);
 
             if (!string.IsNullOrWhiteSpace(request.AuthorName))
             {
@@ -47,7 +48,7 @@ public static class GenerateStandup
 
             if (commits.Count == 0 && prs.Count == 0)
             {
-                return Result<string>.Failure("No engineering activity found in the last 24 hours to summarize.");
+                return Result<string>.Failure("No engineering activity found in the last 48 hours to summarize.");
             }
 
             // 3. Format context for AI
