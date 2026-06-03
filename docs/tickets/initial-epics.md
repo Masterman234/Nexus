@@ -21,7 +21,7 @@ The following epics form the initial product backlog for Nexus. They are designe
 - [x] **NEX-09**: Create the Github Webhook ingest controller.
 - [x] **NEX-10**: Implement the `ProcessGithubWebhookCommand` as a background worker.
 - [x] **NEX-11**: Build the frontend Engineering Timeline view.
-- [ ] **NEX-10b**: Publish `PullRequestMerged` / `PullRequestOpened` integration events from `GithubWebhookConsumer` so other contexts (AI, Incidents) can subscribe.
+- [x] **NEX-10b**: Publish `PullRequestOpened` / `PullRequestMerged` / `CommitPushed` integration events from `GithubWebhookConsumer` so other contexts (AI, Incidents) can subscribe. *(Records live in `Application/Engineering/IntegrationEvents/`; consumer publishes after `SaveChangesAsync` so failed writes never emit ghost events. PR-merged emission is idempotent across webhook redeliveries.)*
 
 ## EPIC-04: AI-Assisted Insights
 **Goal**: Integrate the Gemini API to provide automated value on top of engineering data.

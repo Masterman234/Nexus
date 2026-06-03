@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Nexus.Application.Abstractions;
 using Nexus.Application.Channels;
+using Nexus.Application.Engineering.IntegrationEvents;
 using Nexus.Application.Webhooks.IntegrationEvents;
 using Nexus.Domain.Entities;
 using System.Text.Json;
@@ -27,7 +28,18 @@ public class GithubWebhookConsumer(
         logger.LogInformation(">>> [BOT] Consumer Start: {EventType}", @event.EventType);
 
         // NEX-15: Populate domain entities so the data is queryable, not just JSON.
-        await ProcessEntitiesAsync(@event.EventType, @event.Payload, ct);
+        // NEX-10b: Collect integration events to publish AFTER entities are persisted,
+        // so cross-context subscribers never see a "ghost" event for an entity that
+        // failed to save. Publishing inside the same Consume() context lets MassTransit
+        // route the messages through the same RabbitMQ connection without us touching DI.
+        var integrationEvents = new List<object>();
+        await ProcessEntitiesAsync(@event.EventType, @event.Payload, integrationEvents, ct);
+
+        foreach (var evt in integrationEvents)
+        {
+            await context.Publish(evt, ct);
+            logger.LogInformation(">>> [BOT] Published integration event: {EventType}", evt.GetType().Name);
+        }
 
         var displayMessage = BuildDisplayMessage(@event.EventType, @event.Payload);
 
@@ -56,7 +68,7 @@ public class GithubWebhookConsumer(
             message.SentAt), ct);
     }
 
-    private async Task ProcessEntitiesAsync(string eventType, string payload, CancellationToken ct)
+    private async Task ProcessEntitiesAsync(string eventType, string payload, List<object> integrationEvents, CancellationToken ct)
     {
         try
         {
@@ -66,11 +78,11 @@ public class GithubWebhookConsumer(
 
             if (string.Equals(eventType, "push", StringComparison.OrdinalIgnoreCase))
             {
-                await HandlePushEntitiesAsync(root, ct);
+                await HandlePushEntitiesAsync(root, integrationEvents, ct);
             }
             else if (string.Equals(eventType, "pull_request", StringComparison.OrdinalIgnoreCase))
             {
-                await HandlePullRequestEntitiesAsync(root, ct);
+                await HandlePullRequestEntitiesAsync(root, integrationEvents, ct);
             }
             else
             {
@@ -79,13 +91,17 @@ public class GithubWebhookConsumer(
         }
         catch (Exception ex)
         {
+            // Don't fail the whole consume — the raw payload is already in ExternalEvent
+            // and the chat broadcast can still run. Integration events for *this* delivery
+            // are forfeited but the audit log lets us replay if needed.
+            integrationEvents.Clear();
             logger.LogError(ex, ">>> [BOT] Entity Process Error: {Message}", ex.Message);
         }
     }
 
-    private async Task HandlePushEntitiesAsync(JsonElement root, CancellationToken ct)
+    private async Task HandlePushEntitiesAsync(JsonElement root, List<object> integrationEvents, CancellationToken ct)
     {
-        if (!root.TryGetProperty("repository", out var repoProp)) 
+        if (!root.TryGetProperty("repository", out var repoProp))
         {
             logger.LogWarning(">>> [BOT] No repository property found in push payload.");
             return;
@@ -93,20 +109,23 @@ public class GithubWebhookConsumer(
 
         string repoName = repoProp.GetProperty("full_name").GetString() ?? "unknown";
         logger.LogInformation(">>> [BOT] Processing push for repo: {RepoName}", repoName);
-        
+
         if (root.TryGetProperty("commits", out var commitsProp) && commitsProp.ValueKind == JsonValueKind.Array)
         {
-            int count = 0;
+            // Stage newly-created Commit entities here so we can build integration events
+            // from the same instances we just persisted (CommitId is the in-memory Guid).
+            var newCommits = new List<Commit>();
+
             foreach (var commitElement in commitsProp.EnumerateArray())
             {
                 string? sha = commitElement.GetProperty("id").GetString();
-                if (sha is null) 
+                if (sha is null)
                 {
                     logger.LogWarning(">>> [BOT] Commit ID is null, skipping.");
                     continue;
                 }
-                
-                if (await dbContext.Commits.AnyAsync(c => c.Sha == sha, ct)) 
+
+                if (await dbContext.Commits.AnyAsync(c => c.Sha == sha, ct))
                 {
                     logger.LogInformation(">>> [BOT] Commit {Sha} already exists, skipping.", sha.Substring(0, 7));
                     continue;
@@ -122,13 +141,23 @@ public class GithubWebhookConsumer(
                 );
 
                 dbContext.Commits.Add(commit);
-                count++;
+                newCommits.Add(commit);
             }
-            
-            if (count > 0)
+
+            if (newCommits.Count > 0)
             {
                 await dbContext.SaveChangesAsync(ct);
-                logger.LogInformation(">>> [BOT] Saved {Count} new commits to DB.", count);
+                logger.LogInformation(">>> [BOT] Saved {Count} new commits to DB.", newCommits.Count);
+
+                // Only enqueue events after the SaveChanges round-trip succeeds — if the
+                // DB write throws, we never publish a CommitPushedIntegrationEvent for
+                // a commit that doesn't exist in our store.
+                foreach (var c in newCommits)
+                {
+                    integrationEvents.Add(new CommitPushedIntegrationEvent(
+                        c.Id, c.Sha, c.Message, c.AuthorName, c.AuthorEmail,
+                        c.RepositoryName, c.CommittedAt));
+                }
             }
             else
             {
@@ -141,16 +170,16 @@ public class GithubWebhookConsumer(
         }
     }
 
-    private async Task HandlePullRequestEntitiesAsync(JsonElement root, CancellationToken ct)
+    private async Task HandlePullRequestEntitiesAsync(JsonElement root, List<object> integrationEvents, CancellationToken ct)
     {
-        if (!root.TryGetProperty("pull_request", out var prElement)) 
+        if (!root.TryGetProperty("pull_request", out var prElement))
         {
             logger.LogWarning(">>> [BOT] No pull_request property found in payload.");
             return;
         }
-        
+
         long externalId = prElement.GetProperty("id").GetInt64();
-        string repoName = root.TryGetProperty("repository", out var repoProp) 
+        string repoName = root.TryGetProperty("repository", out var repoProp)
             ? repoProp.GetProperty("full_name").GetString() ?? "unknown"
             : "unknown";
 
@@ -163,28 +192,27 @@ public class GithubWebhookConsumer(
         string state = prElement.GetProperty("state").GetString() ?? "open";
         string url = prElement.GetProperty("html_url").GetString() ?? "";
         string authorName = prElement.GetProperty("user").GetProperty("login").GetString() ?? "Unknown";
-        
+        int number = prElement.GetProperty("number").GetInt32();
+
         DateTime createdAt = prElement.GetProperty("created_at").GetDateTime().ToUniversalTime();
         DateTime updatedAt = prElement.GetProperty("updated_at").GetDateTime().ToUniversalTime();
-        DateTime? mergedAt = prElement.TryGetProperty("merged_at", out var ma) && ma.ValueKind != JsonValueKind.Null && ma.TryGetDateTime(out var mdt) 
-            ? mdt.ToUniversalTime() 
+        DateTime? mergedAt = prElement.TryGetProperty("merged_at", out var ma) && ma.ValueKind != JsonValueKind.Null && ma.TryGetDateTime(out var mdt)
+            ? mdt.ToUniversalTime()
             : null;
 
+        // Capture "was this PR merged on this delivery?" BEFORE we mutate the entity,
+        // so a webhook landing exactly at merge time emits PullRequestMerged once.
+        bool wasMerged = existingPr?.MergedAt is not null;
+        bool isNowMerged = mergedAt is not null;
+        bool isNewlyOpened = existingPr is null;
+
+        PullRequest pr;
         if (existingPr is null)
         {
             logger.LogInformation(">>> [BOT] Creating new PR entity: {Title}", title);
-            var pr = PullRequest.Create(
-                externalId,
-                prElement.GetProperty("number").GetInt32(),
-                title,
-                description,
-                state,
-                url,
-                repoName,
-                authorName,
-                createdAt,
-                updatedAt,
-                mergedAt);
+            pr = PullRequest.Create(
+                externalId, number, title, description, state, url,
+                repoName, authorName, createdAt, updatedAt, mergedAt);
 
             dbContext.PullRequests.Add(pr);
         }
@@ -192,10 +220,30 @@ public class GithubWebhookConsumer(
         {
             logger.LogInformation(">>> [BOT] Updating existing PR entity: {Title}", title);
             existingPr.Update(title, description, state, updatedAt, mergedAt);
+            pr = existingPr;
         }
 
         await dbContext.SaveChangesAsync(ct);
         logger.LogInformation(">>> [BOT] PR saved to DB.");
+
+        // Publish integration events AFTER save. Two distinct signals:
+        //  - "opened" fires once when a brand-new PR row is created.
+        //  - "merged" fires on the delivery where the PR transitions to having
+        //    a merged_at timestamp. Idempotent: a webhook redelivery against an
+        //    already-merged PR (wasMerged == true) will NOT re-emit.
+        if (isNewlyOpened)
+        {
+            integrationEvents.Add(new PullRequestOpenedIntegrationEvent(
+                pr.Id, pr.ExternalId, pr.Number, pr.Title, pr.Description,
+                pr.Url, pr.RepositoryName, pr.AuthorName, pr.CreatedAt));
+        }
+
+        if (isNowMerged && !wasMerged)
+        {
+            integrationEvents.Add(new PullRequestMergedIntegrationEvent(
+                pr.Id, pr.ExternalId, pr.Number, pr.Title, pr.Url,
+                pr.RepositoryName, pr.AuthorName, pr.MergedAt!.Value));
+        }
     }
 
     private async Task<Guid?> ResolveTargetChannelIdAsync(CancellationToken ct)

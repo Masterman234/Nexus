@@ -47,7 +47,7 @@ in a way a single-purpose tool cannot?* If yes, build it. If no, deprioritise.
 - [x] **NEX-11**: High-density Engineering Timeline view with real-time updates.
 - [x] Background workers (RabbitMQ): Foundation configured and consumer-ready.
 - [x] GitHub webhook ingestion: HMAC-verified controller, ExternalEvent persistence.
-- [ ] **NEX-10b**: Broadcast `PullRequestMerged` / `PullRequestOpened` integration events across the bus for cross-context logic.
+- [x] **NEX-10b**: Broadcast `PullRequestOpened` / `PullRequestMerged` / `CommitPushed` integration events across the bus for cross-context logic.
 
 ## Milestone 4: AI Insights & Reasoning (Current)
 - [~] **NEX-12**: Integrate Semantic Kernel with Google Gemini 1.5 Pro.
