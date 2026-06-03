@@ -54,7 +54,7 @@ in a way a single-purpose tool cannot?* If yes, build it. If no, deprioritise.
   *(Direct Gemini call shipped via `AIService`; Semantic Kernel wrapper still pending.)*
 - [~] **NEX-17**: "What did I do today?" AI Standup Generator using Timeline data.
   *(Handler `GenerateStandup` shipped; actively debugging Gemini call — last 5 commits are logging additions.)*
-- [ ] **NEX-16**: `IUserActivityQuery` — per-user cross-context projection (Commits + PRs + Messages + Incidents).
+- [x] **NEX-16**: `IUserActivityQuery` — per-user cross-context projection (Commits + PRs + Messages). Incidents will plug in once EPIC-06 lands `Incident` entity.
 - [ ] **NEX-18**: `/standup` slash command + scheduled dashboard widget.
 - [ ] Feature: AI Incident Summarization (background processing via RabbitMQ).
 - [ ] Feature: AI Code Explanation (streaming response to frontend).

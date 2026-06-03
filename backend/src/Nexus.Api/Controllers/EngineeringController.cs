@@ -17,9 +17,11 @@ public class EngineeringController(ISender sender) : ControllerBase
     }
 
     [HttpPost("standup")]
-    public async Task<IActionResult> GenerateStandup([FromQuery] string? authorName)
+    public async Task<IActionResult> GenerateStandup([FromQuery] Guid? userId, [FromQuery] string? authorName)
     {
-        var result = await sender.Send(new GenerateStandup.Command(authorName));
+        // Prefer userId (NEX-16 path) when provided; fall back to authorName for the
+        // existing frontend call surface until the Timeline UI passes a real user.
+        var result = await sender.Send(new GenerateStandup.Command(UserId: userId, AuthorName: authorName));
         // Return error as `{ message }` so the frontend can read response.data.message
         // (matches what EngineeringTimeline.tsx already expects in its onError handler).
         return result.IsSuccess

@@ -48,9 +48,13 @@ call ingests four data sources unified by `UserId` and timestamp.
 - [x] **NEX-15**: Domain model for `Commit` and `PullRequest` entities; populate
   from `GithubWebhookConsumer` so the data is queryable, not just JSON in
   `ExternalEvent`. *(Entities + EF configs + migration `AddEngineeringEntities` shipped.)*
-- [ ] **NEX-16**: `IUserActivityQuery` projection that returns a user's activity
+- [x] **NEX-16**: `IUserActivityQuery` projection that returns a user's activity
   across all contexts within a time window. SQL-level, not via AI.
-  *(Current `GetEngineeringActivity` is workspace-scoped, not per-user cross-context.)*
+  *(Interface + `UserActivity` DTO in `Application/Engineering/Queries/UserActivity/`,
+  EF implementation in same folder. Messages join by `UserId` FK; Commits/PRs fall back
+  to case-insensitive username/email match until a future ticket adds `AuthorUserId`
+  on those entities. `GenerateStandup` now prefers this path; legacy `AuthorName`
+  LIKE-matching kept for the existing controller call.)*
 - [~] **NEX-17**: `GenerateStandupCommand` MediatR handler — calls Semantic Kernel
   with the activity projection as context, returns markdown.
   *(Implementation landed in `Application/Engineering/Commands/GenerateStandup`;
