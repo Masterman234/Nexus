@@ -42,16 +42,20 @@ in a way a single-purpose tool cannot?* If yes, build it. If no, deprioritise.
 - [x] **DESIGN-01**: Establish premium "Engineering Intelligence" design system.
 - [x] Frontend: Unified Landing Page, Polished Auth Flow, Workspace Shell.
 
-## Milestone 3: Engineering Context & VCS Integration (Current)
+## Milestone 3: Engineering Context & VCS Integration (Wrapping up)
 - [x] **NEX-15**: Structured domain entities for `Commit` and `PullRequest` (parsed from webhooks).
 - [x] **NEX-11**: High-density Engineering Timeline view with real-time updates.
 - [x] Background workers (RabbitMQ): Foundation configured and consumer-ready.
 - [x] GitHub webhook ingestion: HMAC-verified controller, ExternalEvent persistence.
-- [ ] Integration Events: Broadcasting `PullRequestMerged` across the bus for cross-context logic.
+- [ ] **NEX-10b**: Broadcast `PullRequestMerged` / `PullRequestOpened` integration events across the bus for cross-context logic.
 
-## Milestone 4: AI Insights & Reasoning (Up Next)
-- [ ] **NEX-12**: Integrate Semantic Kernel with Google Gemini 1.5 Pro.
-- [ ] **NEX-17**: "What did I do today?" AI Standup Generator using Timeline data.
+## Milestone 4: AI Insights & Reasoning (Current)
+- [~] **NEX-12**: Integrate Semantic Kernel with Google Gemini 1.5 Pro.
+  *(Direct Gemini call shipped via `AIService`; Semantic Kernel wrapper still pending.)*
+- [~] **NEX-17**: "What did I do today?" AI Standup Generator using Timeline data.
+  *(Handler `GenerateStandup` shipped; actively debugging Gemini call — last 5 commits are logging additions.)*
+- [ ] **NEX-16**: `IUserActivityQuery` — per-user cross-context projection (Commits + PRs + Messages + Incidents).
+- [ ] **NEX-18**: `/standup` slash command + scheduled dashboard widget.
 - [ ] Feature: AI Incident Summarization (background processing via RabbitMQ).
 - [ ] Feature: AI Code Explanation (streaming response to frontend).
 

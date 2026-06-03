@@ -13,8 +13,10 @@ namespace Nexus.Infrastructure.AI;
 /// Replaces the experimental Semantic Kernel connector, which does not
 /// authenticate correctly with the new AQ.* API key format Google began
 /// issuing in 2026. Calls https://generativelanguage.googleapis.com/v1beta
-/// with the key as a `?key=` query parameter — the format both AIzaSy and
-/// AQ. keys accept.
+/// and sends the key via the <c>x-goog-api-key</c> header — required for
+/// AQ.* keys; legacy AIzaSy* keys also accept this form. The previous
+/// <c>?key=</c> query-string format is rejected by the API for AQ.* keys
+/// with HTTP 400/401.
 /// </summary>
 public class AIService(HttpClient httpClient, IConfiguration configuration, ILogger<AIService> logger) : IAIService
 {
@@ -44,11 +46,19 @@ public class AIService(HttpClient httpClient, IConfiguration configuration, ILog
             }
         };
 
-        var url = $"v1beta/models/{modelId}:generateContent?key={apiKey}";
+        var url = $"v1beta/models/{modelId}:generateContent";
 
         try
         {
-            using var response = await httpClient.PostAsJsonAsync(url, requestBody, JsonOptions, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = JsonContent.Create(requestBody, options: JsonOptions)
+            };
+            // x-goog-api-key works for both AIzaSy* and AQ.* key formats.
+            // Query-string `?key=` is rejected by the API for AQ.* keys.
+            request.Headers.Add("x-goog-api-key", apiKey);
+
+            using var response = await httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {

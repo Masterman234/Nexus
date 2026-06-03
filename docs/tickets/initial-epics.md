@@ -20,13 +20,14 @@ The following epics form the initial product backlog for Nexus. They are designe
 - [x] **NEX-08**: Configure MassTransit and RabbitMQ in the backend.
 - [x] **NEX-09**: Create the Github Webhook ingest controller.
 - [x] **NEX-10**: Implement the `ProcessGithubWebhookCommand` as a background worker.
-- [ ] **NEX-11**: Build the frontend Engineering Timeline view.
+- [x] **NEX-11**: Build the frontend Engineering Timeline view.
+- [ ] **NEX-10b**: Publish `PullRequestMerged` / `PullRequestOpened` integration events from `GithubWebhookConsumer` so other contexts (AI, Incidents) can subscribe.
 
 ## EPIC-04: AI-Assisted Insights
 **Goal**: Integrate the Gemini API to provide automated value on top of engineering data.
-- **NEX-12**: Implement Semantic Kernel abstraction layer in `Nexus.Infrastructure`.
-- **NEX-13**: Implement `GenerateIncidentSummaryCommand` (triggered via RabbitMQ when an incident occurs).
-- **NEX-14**: Build frontend AI chat window with Server-Sent Events (SSE) streaming support.
+- [~] **NEX-12**: Implement Semantic Kernel abstraction layer in `Nexus.Infrastructure`. *(Partially shipped as `AIService` calling Gemini directly; SK wrapper still pending.)*
+- [ ] **NEX-13**: Implement `GenerateIncidentSummaryCommand` (triggered via RabbitMQ when an incident occurs).
+- [ ] **NEX-14**: Build frontend AI chat window with Server-Sent Events (SSE) streaming support.
 
 ---
 
@@ -44,14 +45,17 @@ triaged, and chat threads they participated in.
 This is the canonical demo of the cross-context architecture — a single Gemini
 call ingests four data sources unified by `UserId` and timestamp.
 
-- **NEX-15**: Domain model for `Commit` and `PullRequest` entities; populate
+- [x] **NEX-15**: Domain model for `Commit` and `PullRequest` entities; populate
   from `GithubWebhookConsumer` so the data is queryable, not just JSON in
-  `ExternalEvent`.
-- **NEX-16**: `IUserActivityQuery` projection that returns a user's activity
+  `ExternalEvent`. *(Entities + EF configs + migration `AddEngineeringEntities` shipped.)*
+- [ ] **NEX-16**: `IUserActivityQuery` projection that returns a user's activity
   across all contexts within a time window. SQL-level, not via AI.
-- **NEX-17**: `GenerateStandupCommand` MediatR handler — calls Semantic Kernel
+  *(Current `GetEngineeringActivity` is workspace-scoped, not per-user cross-context.)*
+- [~] **NEX-17**: `GenerateStandupCommand` MediatR handler — calls Semantic Kernel
   with the activity projection as context, returns markdown.
-- **NEX-18**: `/standup` slash command in chat + a dashboard widget that runs
+  *(Implementation landed in `Application/Engineering/Commands/GenerateStandup`;
+  currently debugging Gemini integration — see commits `5faafd3`, `8b2910e`, `23b5314`.)*
+- [ ] **NEX-18**: `/standup` slash command in chat + a dashboard widget that runs
   on schedule (Hangfire / cron) and posts each user's standup to a configured
   channel.
 
@@ -62,17 +66,17 @@ the PRs that touched the affected files, and the alert payload.
 
 This is the killer feature for SRE/DevOps audiences.
 
-- **NEX-19**: Domain model for `Incident` (status, severity, affected services,
+- [ ] **NEX-19**: Domain model for `Incident` (status, severity, affected services,
   start/end timestamps).
-- **NEX-20**: Ingest adapter for at least one alerting source (CloudWatch,
+- [ ] **NEX-20**: Ingest adapter for at least one alerting source (CloudWatch,
   PagerDuty, or a mock JSON endpoint) → emit `IncidentCreated` /
   `IncidentResolved` integration events.
-- **NEX-21**: `IncidentTimelineQuery` — given an incident, gather correlated
+- [ ] **NEX-21**: `IncidentTimelineQuery` — given an incident, gather correlated
   messages, commits, PRs by time window + service tag.
-- **NEX-22**: `DraftPostmortemCommand` handler — Semantic Kernel prompt that
+- [ ] **NEX-22**: `DraftPostmortemCommand` handler — Semantic Kernel prompt that
   outputs a structured markdown postmortem (Timeline, Root Cause, Impact,
   Action Items).
-- **NEX-23**: Postmortem editor UI — drafted doc is the starting point; user
+- [ ] **NEX-23**: Postmortem editor UI — drafted doc is the starting point; user
   edits in-app, exports to GitHub Issue or markdown file.
 
 ## EPIC-07: Smart Cross-Linking (Tier S)
@@ -83,12 +87,12 @@ chat threads mentioning the same service.
 No literal graph DB; just SQL queries over the structured event spine. The UX
 is what sells the architecture.
 
-- **NEX-24**: Reference extractor — parse `NEX-\d+` / `#\d+` / `SEV-\d+` style
+- [ ] **NEX-24**: Reference extractor — parse `NEX-\d+` / `#\d+` / `SEV-\d+` style
   references out of commit messages, PR titles, chat messages on save.
   Persist as a `EntityReference` join row.
-- **NEX-25**: Backfill job — run the extractor against the existing
+- [ ] **NEX-25**: Backfill job — run the extractor against the existing
   `ExternalEvent` history.
-- **NEX-26**: "Related" sidebar on every entity view (PR, ticket, incident,
+- [ ] **NEX-26**: "Related" sidebar on every entity view (PR, ticket, incident,
   message) showing what else references it.
 
 ---
