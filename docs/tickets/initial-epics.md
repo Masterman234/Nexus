@@ -55,13 +55,21 @@ call ingests four data sources unified by `UserId` and timestamp.
   to case-insensitive username/email match until a future ticket adds `AuthorUserId`
   on those entities. `GenerateStandup` now prefers this path; legacy `AuthorName`
   LIKE-matching kept for the existing controller call.)*
-- [~] **NEX-17**: `GenerateStandupCommand` MediatR handler — calls Semantic Kernel
+- [x] **NEX-17**: `GenerateStandupCommand` MediatR handler — calls the AI service
   with the activity projection as context, returns markdown.
-  *(Implementation landed in `Application/Engineering/Commands/GenerateStandup`;
-  currently debugging Gemini integration — see commits `5faafd3`, `8b2910e`, `23b5314`.)*
-- [ ] **NEX-18**: `/standup` slash command in chat + a dashboard widget that runs
+  *(Handler in `Application/Engineering/Commands/GenerateStandup`. End-to-end
+  verified once the Gemini auth bug was fixed — `AQ.*`-format keys must be sent
+  via the `x-goog-api-key` header, not the `?key=` query parameter.)*
+- [~] **NEX-18**: `/standup` slash command in chat + a dashboard widget that runs
   on schedule (Hangfire / cron) and posts each user's standup to a configured
   channel.
+  *(Slash command shipped: `ChatCommand` parser + `IChatCommandRouter` in
+  `Application/ChatCommands/`, hooked into `SendMessage.Handler`. Router runs
+  fire-and-forget in a fresh DI scope so the user's POST returns immediately
+  and the bot reply lands via SignalR a few seconds later. Replies are
+  attributed to a new `nexus-bot` system user (seeded alongside `github-bot`)
+  so the UI can distinguish AI replies from GitHub activity. Scheduled posting
+  via Hangfire still pending.)*
 
 ## EPIC-06: Postmortem Assistant (Tier S)
 **Goal**: When an incident is resolved, Nexus auto-drafts a postmortem from the
@@ -70,8 +78,10 @@ the PRs that touched the affected files, and the alert payload.
 
 This is the killer feature for SRE/DevOps audiences.
 
-- [ ] **NEX-19**: Domain model for `Incident` (status, severity, affected services,
-  start/end timestamps).
+- [x] **NEX-19**: Domain model for `Incident` (status, severity, affected services,
+  start/end timestamps). *(`Incident` + `IncidentSeverity`/`IncidentStatus`, EF
+  config, migration `AddIncidentEntities`; Declare/Resolve/List handlers and the
+  `/incident` slash command also shipped.)*
 - [ ] **NEX-20**: Ingest adapter for at least one alerting source (CloudWatch,
   PagerDuty, or a mock JSON endpoint) → emit `IncidentCreated` /
   `IncidentResolved` integration events.
@@ -91,13 +101,77 @@ chat threads mentioning the same service.
 No literal graph DB; just SQL queries over the structured event spine. The UX
 is what sells the architecture.
 
-- [ ] **NEX-24**: Reference extractor — parse `NEX-\d+` / `#\d+` / `SEV-\d+` style
-  references out of commit messages, PR titles, chat messages on save.
-  Persist as a `EntityReference` join row.
+- [x] **NEX-24**: Reference extractor — parses `NEX-\d+` / `#\d+` / `SEV-\d+` style
+  references out of commit messages, PR titles, chat messages on save and
+  persists `EntityReference` rows. *(`ReferenceExtractor` wired into `SendMessage`,
+  `CreateTicket`, `UpdateTicket`, `AddTicketComment`, `GithubWebhookConsumer`.)*
 - [ ] **NEX-25**: Backfill job — run the extractor against the existing
-  `ExternalEvent` history.
-- [ ] **NEX-26**: "Related" sidebar on every entity view (PR, ticket, incident,
-  message) showing what else references it.
+  `ExternalEvent` history. *(Not yet built.)*
+- [x] **NEX-26**: "Related" sidebar on entity views showing what else references it.
+  *(`ReferencesController` `GET {id}/related` + frontend Related sidebar.)*
+
+## EPIC-08: Native Ticketing (Tier S)
+**Goal**: A thin, chat-first ticketing context that lives inside Nexus — not a
+Jira clone. The product wedge is that tickets share the same event spine as
+commits, PRs, incidents, and chat, so the AI features and cross-linking work
+across all of them in one query.
+
+This epic deliberately does NOT try to compete with Jira on feature surface
+area (no sprints, no story points, no custom workflows, no permissions beyond
+workspace membership). Five fixed statuses, slash-command UX, optional Kanban
+view. The win is integration depth, not feature breadth.
+
+Slot order: ship after EPIC-05 (so standup can include tickets) but before
+EPIC-06 / EPIC-07 so the Postmortem Assistant can emit *real* action-item
+tickets and Smart Cross-Linking can resolve `NEX-#` references to actual rows.
+
+- [x] **NEX-27**: Domain model for `Ticket` (Id, workspace-scoped sequential
+  Number, Title, Description, Status enum {Open, InProgress, Blocked, InReview,
+  Done, Closed}, Priority, AssigneeUserId, CreatorUserId, WorkspaceId,
+  CreatedAt, UpdatedAt, ResolvedAt) + `TicketComment` + `TicketStatusChange`
+  audit row. EF configs + migration. *(Migration `AddTicketingEntities`.)*
+- [x] **NEX-28**: MediatR commands & queries:
+  `CreateTicketCommand`, `UpdateTicketCommand`, `AssignTicketCommand`,
+  `TransitionTicketStatusCommand`, `AddTicketCommentCommand`,
+  `GetTicketByNumberQuery`, `ListTicketsForUserQuery` (+ `GetTicketByIdQuery`).
+  Each transition writes a `TicketStatusChange` row — full audit history.
+- [x] **NEX-29**: Integration events from the Tickets context:
+  `TicketCreatedIntegrationEvent`, `TicketAssignedIntegrationEvent`,
+  `TicketStatusChangedIntegrationEvent`, `TicketResolvedIntegrationEvent`.
+  Same publish-after-save pattern as `GithubWebhookConsumer`.
+- [x] **NEX-30**: Slash commands wired through NEX-18's router:
+  `/ticket new "Title"`, `/ticket NEX-12`, `/ticket assign NEX-12 @alice`,
+  `/ticket close NEX-12`, `/ticket comment NEX-12 "..."`, `/ticket list`.
+  Bot responses post into the originating channel.
+- [x] **NEX-31**: Auto-transition on PR merge — `PullRequestMergedConsumer`
+  subscribes to `PullRequestMergedIntegrationEvent`, parses the PR body for
+  `Closes NEX-\d+` / `Fixes NEX-\d+` and moves matching tickets to `Done`.
+  Closes the GitHub ↔ Tickets loop without user action.
+
+### Plug-ins to other epics (no extra ticket — falls out of NEX-27 to NEX-31)
+- `IUserActivityQuery` (NEX-16) gains a `Tickets` slot. Standup now mentions
+  closed/in-progress tickets per user.
+- `IncidentTimelineQuery` (NEX-21) joins tickets created during the incident
+  window. Postmortem drafts include them automatically.
+- `DraftPostmortemCommand` (NEX-22) returns a list of `ProposedTicket` records
+  in addition to markdown. UI offers a one-click "create" per item.
+- Smart Cross-Linking (NEX-24) resolves `NEX-#` references to ticket rows
+  instead of just persisting opaque strings.
+
+### Explicit non-goals for EPIC-08
+- Custom workflows / state machines beyond the fixed 6 statuses
+- Sprints, epics-as-feature, story points, burn-down charts
+- Custom fields / form builder
+- Permissions beyond "workspace member can do anything"
+- Email notifications (SignalR + chat mentions are enough)
+- Jira / Linear import — defer indefinitely
+
+### Optional follow-on (after Tier S epics)
+- [x] **NEX-32 (Tier A)**: Kanban board UI at `/tickets`. Drag cards between
+  status columns; drag publishes `TicketStatusChangedIntegrationEvent`.
+  *(`features/tickets/TicketKanban.tsx`.)*
+- [x] **NEX-33 (Tier A)**: Ticket detail page with comments, history timeline,
+  related entities sidebar fed by Smart Cross-Linking.
 
 ---
 
