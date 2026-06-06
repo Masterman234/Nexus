@@ -16,12 +16,14 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
     {
         logger.LogError(exception, "An unhandled exception occurred: {Message}", exception.Message);
 
+        var isDevelopment = httpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment();
+
         var problemDetails = new ProblemDetails
         {
             Status = StatusCodes.Status500InternalServerError,
             Title = "An error occurred while processing your request.",
             Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
-            Detail = exception.Message // In production, consider hiding internal details
+            Detail = isDevelopment ? exception.Message : "An internal error occurred."
         };
 
         httpContext.Response.StatusCode = problemDetails.Status.Value;

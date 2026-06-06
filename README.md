@@ -94,22 +94,24 @@ Nexus is built like a real engineering startup. All critical decisions, structur
 
 ## 📊 Status
 
-**Shipped** (foundations + ingestion spine):
+**Shipped** (foundations + ingestion spine + first cross-context feature):
 - Identity & JWT auth, workspaces, channels
 - Real-time chat (SignalR + Redis backplane), persisted history
 - RabbitMQ + MassTransit message bus
 - **GitHub webhook ingestion** — HMAC-verified, raw-body preserving, `ExternalEvent` audit log, RabbitMQ-backed consumer broadcasting to chat
+- `Commit` / `PullRequest` domain entities populated from webhook payloads (NEX-15)
+- Frontend Engineering Timeline view (NEX-11)
+- **Cross-context integration events** — `PullRequestOpened` / `PullRequestMerged` / `CommitPushed` published from the webhook consumer (NEX-10b)
+- **`IUserActivityQuery`** — single per-user projection joining Commits + PRs + Messages by time window (NEX-16)
+- **AI Standup Generator** — `GenerateStandup` MediatR handler calling Gemini through `IAIService` abstraction (NEX-17)
 - OpenTelemetry tracing, Serilog structured logging, health checks
 - Clean Architecture layering (Domain / Application / Infrastructure / Api) enforced via NetArchTest
 
-**In progress** (Engineering Context domain modelling):
-- Frontend Engineering Timeline view (NEX-11)
-- `Commit` / `PullRequest` domain entities populated from webhook payloads (NEX-15)
-
-**Next** (the differentiator features):
-- AI Standup Generator (EPIC-05) — single Semantic Kernel call across PRs, commits, incidents, chat
-- Postmortem Assistant (EPIC-06) — auto-draft from correlated chat + deploys + alerts
-- Smart Cross-Linking (EPIC-07) — implicit graph over the event log
+**Up next** (user-facing surface for the AI features):
+- `/standup` slash command in chat + scheduled dashboard widget (NEX-18) — also lays the slash-command router used by ticketing
+- Native Ticketing (EPIC-08) — thin chat-first ticketing context that shares the event spine with code, chat, and incidents; AI features then reason over tickets too without changing the standup query shape
+- Postmortem Assistant (EPIC-06) — auto-draft from correlated chat + deploys + alerts; emits draft action-item tickets once EPIC-08 lands
+- Smart Cross-Linking (EPIC-07) — implicit graph over the event log; `NEX-#` references resolve to real ticket rows once EPIC-08 lands
 
 ## 🚀 Quick Start (Local Development)
 

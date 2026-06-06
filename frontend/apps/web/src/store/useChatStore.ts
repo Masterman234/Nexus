@@ -11,6 +11,7 @@ export interface Channel {
   id: string
   name: string
   description: string
+  workspaceId: string
 }
 
 interface ChatState {
@@ -18,6 +19,7 @@ interface ChatState {
   activeChannel: Channel | null
   messages: Record<string, Message[]>
   setChannels: (channels: Channel[]) => void
+  addChannel: (channel: Channel) => void
   setActiveChannel: (channel: Channel | null) => void
   addMessage: (channelId: string, message: Message) => void
   updateMessage: (channelId: string, message: Message) => void
@@ -30,6 +32,11 @@ export const useChatStore = create<ChatState>((set) => ({
   activeChannel: null,
   messages: {},
   setChannels: (channels) => set({ channels }),
+  addChannel: (channel) => 
+    set((state) => {
+      if (state.channels.some(c => c.id === channel.id)) return state
+      return { channels: [...state.channels, channel] }
+    }),
   setActiveChannel: (channel) => set({ activeChannel: channel }),
   addMessage: (channelId, message) =>
     set((state) => {

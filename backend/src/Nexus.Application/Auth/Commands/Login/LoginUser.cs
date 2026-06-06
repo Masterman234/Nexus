@@ -2,13 +2,15 @@ using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Nexus.Application.Abstractions;
+using Nexus.Domain.Entities;
 using Nexus.SharedKernel;
 
 namespace Nexus.Application.Auth.Commands.Login;
 
 public static class LoginUser
 {
-    public record Command(string Email, string Password) : IRequest<Result<AuthResponse>>;
+    public record Command(string Email, string Password, string? CreatedByIp, string? UserAgent)
+        : IRequest<Result<AuthTokensResult>>;
 
     public class Validator : AbstractValidator<Command>
     {
@@ -22,24 +24,53 @@ public static class LoginUser
     public class Handler(
         IApplicationDbContext dbContext,
         IPasswordHasher passwordHasher,
-        IJwtProvider jwtProvider)
-        : IRequestHandler<Command, Result<AuthResponse>>
+        IJwtProvider jwtProvider,
+        IRefreshTokenHasher refreshTokenHasher)
+        : IRequestHandler<Command, Result<AuthTokensResult>>
     {
-        public async Task<Result<AuthResponse>> Handle(Command request, CancellationToken cancellationToken)
+        public async Task<Result<AuthTokensResult>> Handle(Command request, CancellationToken cancellationToken)
         {
             var user = await dbContext.Users
                 .FirstOrDefaultAsync(u => u.Email == request.Email, cancellationToken);
 
-            if (user is null || !passwordHasher.Verify(request.Password, user.PasswordHash))
+            // Verify regardless of user existence to keep timing roughly uniform.
+            // BCrypt.Verify against a known-good dummy hash burns ~equivalent CPU
+            // so attackers can't enumerate emails via response-time differences.
+            var passwordOk = user is not null
+                ? passwordHasher.Verify(request.Password, user.PasswordHash)
+                : passwordHasher.Verify(request.Password, DummyHash);
+
+            if (user is null || !passwordOk)
             {
-                return Result<AuthResponse>.Failure("Invalid credentials.");
+                return Result<AuthTokensResult>.Failure("Invalid credentials.");
             }
 
-            var token = jwtProvider.Generate(user);
+            var (accessToken, accessExpiresAt) = jwtProvider.Generate(user);
 
-            return Result<AuthResponse>.Success(new AuthResponse(
-                token,
-                new UserResponse(user.Id, user.Email, user.Username)));
+            var rawRefreshToken = refreshTokenHasher.GenerateRawToken();
+            var refreshExpiresAt = DateTime.UtcNow.Add(jwtProvider.RefreshTokenLifetime);
+            var refreshToken = RefreshToken.Create(
+                user.Id,
+                refreshTokenHasher.Hash(rawRefreshToken),
+                refreshExpiresAt,
+                request.CreatedByIp,
+                request.UserAgent);
+
+            dbContext.RefreshTokens.Add(refreshToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result<AuthTokensResult>.Success(new AuthTokensResult(
+                new AuthResponse(
+                    accessToken,
+                    accessExpiresAt,
+                    new UserResponse(user.Id, user.Email, user.Username, user.Role.ToString())),
+                rawRefreshToken,
+                refreshExpiresAt));
         }
+
+        // Pre-computed BCrypt hash of an arbitrary fixed string. Verifying against
+        // this when the user isn't found takes the same ~100ms as a real check,
+        // closing a timing oracle on email enumeration.
+        private const string DummyHash = "$2a$11$ZcVHEGmYsW7t8L0M0pXJce/JIM4G8aLh8bWlYVQ1KQXWXgJ6QH/qK";
     }
 }

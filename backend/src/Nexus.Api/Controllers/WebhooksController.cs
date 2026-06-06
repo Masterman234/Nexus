@@ -2,6 +2,7 @@ using Asp.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Nexus.Application.Webhooks.Commands.HandleGithubWebhook;
@@ -15,6 +16,9 @@ namespace Nexus.Api.Controllers;
 // {version:apiVersion} segment is harmless from GitHub's perspective. To evolve the
 // payload contract later, ship a sibling controller with [ApiVersion("2.0")].
 [Route("api/v{version:apiVersion}/webhooks")]
+// GitHub authenticates via HMAC signature, not a JWT — these endpoints must accept
+// anonymous calls. The HMAC check inside the controller is the security boundary.
+[AllowAnonymous]
 public class WebhooksController(
     ISender sender, 
     IConfiguration configuration,

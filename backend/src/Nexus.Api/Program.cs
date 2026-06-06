@@ -48,7 +48,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 });
 
 // Custom Middleware
-app.UseGlobalExceptionHandler();
+app.UseExceptionHandler();
 
 app.UseCors("AllowFrontend");
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -65,6 +65,10 @@ app.UseWhen(
     branch => branch.UseHttpsRedirection());
 
 app.UseRateLimiter();
+
+// AuthN before AuthZ; both must run before MapControllers so [Authorize] is honored.
+app.UseAuthentication();
+app.UseAuthorization();
 
 var apiVersionSet = app.NewApiVersionSet()
     .HasApiVersion(new Asp.Versioning.ApiVersion(1, 0))

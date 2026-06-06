@@ -57,8 +57,8 @@ public static class GenerateStandup
 
                 var activity = await userActivityQuery.GetAsync(userId, since, until, cancellationToken);
 
-                logger.LogInformation(">>> [AI] Activity: {Commits} commits, {Prs} PRs, {Msgs} messages.",
-                    activity.Commits.Count, activity.PullRequests.Count, activity.Messages.Count);
+                logger.LogInformation(">>> [AI] Activity: {Commits} commits, {Prs} PRs, {Tickets} tickets, {Msgs} messages.",
+                    activity.Commits.Count, activity.PullRequests.Count, activity.Tickets.Count, activity.Messages.Count);
 
                 if (activity.IsEmpty)
                 {
@@ -114,6 +114,13 @@ public static class GenerateStandup
             foreach (var pr in a.PullRequests)
             {
                 sb.AppendLine($"- [{pr.RepositoryName}] PR #{pr.Number}: {pr.Title} (State: {pr.State})");
+            }
+
+            sb.AppendLine("\nTICKETS:");
+            if (a.Tickets.Count == 0) sb.AppendLine("- (none)");
+            foreach (var t in a.Tickets)
+            {
+                sb.AppendLine($"- NEX-{t.Number}: {t.Title} (Status: {t.Status}, Priority: {t.Priority})");
             }
 
             sb.AppendLine("\nCHAT MESSAGES:");
