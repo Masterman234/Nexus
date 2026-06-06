@@ -47,7 +47,8 @@ public sealed class UserActivityQuery(IApplicationDbContext dbContext) : IUserAc
                 since, until,
                 Array.Empty<CommitActivity>(),
                 Array.Empty<PullRequestActivity>(),
-                Array.Empty<MessageActivity>());
+                Array.Empty<MessageActivity>(),
+                Array.Empty<TicketActivity>());
         }
 
         // Lower-case once on the client and reuse — keeps EF translation simple and
@@ -84,8 +85,17 @@ public sealed class UserActivityQuery(IApplicationDbContext dbContext) : IUserAc
                 m.Id, m.Content, m.ChannelId, m.SentAt))
             .ToListAsync(cancellationToken);
 
+        var tickets = await dbContext.Tickets
+            .Where(t =>
+                (t.CreatorUserId == userId || t.AssigneeUserId == userId) &&
+                t.UpdatedAt >= since && t.UpdatedAt < until)
+            .OrderByDescending(t => t.UpdatedAt)
+            .Select(t => new TicketActivity(
+                t.Id, t.Number, t.Title, t.Status.ToString(), t.Priority.ToString(), t.UpdatedAt))
+            .ToListAsync(cancellationToken);
+
         return new UserActivity(
             user.Id, user.Username, since, until,
-            commits, pullRequests, messages);
+            commits, pullRequests, messages, tickets);
     }
 }

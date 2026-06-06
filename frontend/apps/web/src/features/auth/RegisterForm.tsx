@@ -1,7 +1,13 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
+import { AxiosError } from "axios"
 import api from "@/lib/api"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuthStore, type User } from "@/store/useAuthStore"
+
+interface AuthResponse {
+  user: User
+  token: string
+}
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,7 +24,7 @@ export function RegisterForm() {
       const response = await api.post("/auth/register", { email, username, password })
       return response.data
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: AuthResponse) => {
       setAuth(data.user, data.token)
     },
   })
@@ -69,7 +75,7 @@ export function RegisterForm() {
       {mutation.isError && (
         <div className="flex items-center gap-3 text-sm text-red-600 bg-red-50 p-4 rounded-xl border border-red-100 animate-in fade-in zoom-in-95 duration-200">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          <p className="font-medium">{(mutation.error as any).response?.data || "Failed to create account."}</p>
+          <p className="font-medium">{(mutation.error as AxiosError)?.response?.data as string || "Failed to create account."}</p>
         </div>
       )}
 

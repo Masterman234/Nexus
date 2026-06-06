@@ -15,17 +15,19 @@ import {
   Activity, 
   Bell,
   Search,
-  Cpu
+  Cpu,
+  Layout
 } from "lucide-react"
 import { useSignalR } from "@/store/useSignalR"
 import { EngineeringTimeline } from "@/features/engineering/EngineeringTimeline"
+import { TicketKanban } from "@/features/tickets/TicketKanban"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
 export function ChatContainer() {
   const { setChannels, setActiveChannel, activeChannel } = useChatStore()
   const { user, logout } = useAuthStore()
-  const [view, setView] = useState<"chat" | "engineering">("chat")
+  const [view, setView] = useState<"chat" | "engineering" | "tickets">("chat")
 
   // Initialize SignalR connection
   useSignalR()
@@ -100,6 +102,18 @@ export function ChatContainer() {
               <Activity className="h-3.5 w-3.5" />
               Intelligence
             </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn(
+                "h-8 gap-2 px-3 text-xs font-bold uppercase tracking-wider transition-all",
+                view === "tickets" ? "text-[#06B6D4] bg-[#06B6D4]/10" : "text-slate-400 hover:text-white"
+              )}
+              onClick={() => setView("tickets")}
+            >
+              <Layout className="h-3.5 w-3.5" />
+              Tickets
+            </Button>
           </nav>
         </div>
         
@@ -143,6 +157,8 @@ export function ChatContainer() {
           <div className="flex flex-1 flex-col relative z-10 min-h-0">
             {view === "engineering" ? (
               <EngineeringTimeline />
+            ) : view === "tickets" ? (
+              <TicketKanban />
             ) : activeChannel ? (
               <>
                 <div className="h-12 border-b border-[#334155]/30 flex items-center px-6 justify-between bg-[#0F172A]/50 backdrop-blur-sm shrink-0">

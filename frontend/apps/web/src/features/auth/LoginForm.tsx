@@ -1,7 +1,13 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
+import { AxiosError } from "axios"
 import api from "@/lib/api"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuthStore, type User } from "@/store/useAuthStore"
+
+interface AuthResponse {
+  user: User
+  token: string
+}
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,7 +23,7 @@ export function LoginForm() {
       const response = await api.post("/auth/login", { email, password })
       return response.data
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: AuthResponse) => {
       setAuth(data.user, data.token)
     },
   })
@@ -43,7 +49,7 @@ export function LoginForm() {
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between ml-1">
-            <Label htmlFor="password" university-font-semibold className="text-sm font-semibold text-slate-700">Password</Label>
+            <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Password</Label>
             <button type="button" className="text-xs text-[#06B6D4] hover:text-[#0891B2] font-bold transition-colors">Forgot password?</button>
         </div>
         <Input
@@ -60,7 +66,7 @@ export function LoginForm() {
       {mutation.isError && (
         <div className="flex items-center gap-3 text-sm text-red-600 bg-red-50 p-4 rounded-xl border border-red-100 animate-in fade-in zoom-in-95 duration-200">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          <p className="font-medium">{(mutation.error as any).response?.data || "Invalid email or password."}</p>
+          <p className="font-medium">{(mutation.error as AxiosError)?.response?.data as string || "Invalid email or password."}</p>
         </div>
       )}
 

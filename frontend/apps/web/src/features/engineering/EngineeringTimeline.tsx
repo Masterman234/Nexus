@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import api from "@/lib/api";
 import type { EngineeringActivity } from "./types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,7 +59,7 @@ export function EngineeringTimeline() {
       setStandup(summary);
       setIsStandupOpen(true);
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<{ message?: string }>) => {
       console.error("AI Standup Failed:", error.response?.data || error.message);
       alert("AI Standup Failed: " + (error.response?.data?.message || error.message || "Unknown error"));
     }

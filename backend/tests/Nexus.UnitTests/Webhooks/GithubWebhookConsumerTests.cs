@@ -17,6 +17,7 @@ public class GithubWebhookConsumerTests : TestBase
 {
     private readonly Mock<IChatService> _chatServiceMock;
     private readonly Mock<IConfiguration> _configurationMock;
+    private readonly Mock<IReferenceExtractor> _referenceExtractorMock;
     private readonly Mock<ILogger<GithubWebhookConsumer>> _loggerMock;
     private readonly GithubWebhookConsumer _consumer;
 
@@ -24,11 +25,17 @@ public class GithubWebhookConsumerTests : TestBase
     {
         _chatServiceMock = new Mock<IChatService>();
         _configurationMock = new Mock<IConfiguration>();
+        _referenceExtractorMock = new Mock<IReferenceExtractor>();
         _loggerMock = new Mock<ILogger<GithubWebhookConsumer>>();
+
+        _referenceExtractorMock.Setup(x => x.Extract(It.IsAny<string>()))
+            .Returns(Enumerable.Empty<ExtractedReference>());
+
         _consumer = new GithubWebhookConsumer(
             DbContext, 
             _chatServiceMock.Object, 
             _configurationMock.Object,
+            _referenceExtractorMock.Object,
             _loggerMock.Object);
     }
 

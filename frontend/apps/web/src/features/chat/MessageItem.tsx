@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
+import { AxiosError } from "axios"
 import api from "@/lib/api"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useChatStore, type Message } from "@/store/useChatStore"
@@ -36,7 +37,7 @@ export function MessageItem({ message, channelId }: MessageItemProps) {
       setIsEditing(false)
       setShowMenu(false)
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ message?: string }>) => {
       console.error("Edit Failed:", err.response?.data || err.message)
       alert("Failed to edit message: " + (err.response?.data?.message || err.message))
     }
@@ -50,7 +51,7 @@ export function MessageItem({ message, channelId }: MessageItemProps) {
       deleteMessage(channelId, message.id)
       setShowMenu(false)
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ message?: string }>) => {
       console.error("Delete Failed:", err.response?.data || err.message)
       alert("Failed to delete message: " + (err.response?.data?.message || err.message))
     }

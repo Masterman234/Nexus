@@ -13,9 +13,10 @@ public sealed record UserActivity(
     DateTime Until,
     IReadOnlyList<CommitActivity> Commits,
     IReadOnlyList<PullRequestActivity> PullRequests,
-    IReadOnlyList<MessageActivity> Messages)
+    IReadOnlyList<MessageActivity> Messages,
+    IReadOnlyList<TicketActivity> Tickets)
 {
-    public bool IsEmpty => Commits.Count == 0 && PullRequests.Count == 0 && Messages.Count == 0;
+    public bool IsEmpty => Commits.Count == 0 && PullRequests.Count == 0 && Messages.Count == 0 && Tickets.Count == 0;
 }
 
 public sealed record CommitActivity(
@@ -40,3 +41,11 @@ public sealed record MessageActivity(
     string Content,
     Guid ChannelId,
     DateTime SentAt);
+
+public sealed record TicketActivity(
+    Guid Id,
+    int Number,
+    string Title,
+    string Status,
+    string Priority,
+    DateTime UpdatedAt);

@@ -2,21 +2,25 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Nexus.Application.Auth;
-using Nexus.Application.Auth.Commands.Register;
 using Xunit;
 
 namespace Nexus.IntegrationTests.Auth;
 
 public class AuthTests : IntegrationTestBase
 {
+    // Mirrors AuthController's request DTOs without taking a project reference on
+    // the API project — these tests speak to it over HTTP.
+    private record RegisterRequest(string Email, string Username, string Password);
+    private record LoginRequest(string Email, string Password);
+
     [Fact]
     public async Task Register_Should_ReturnOk_WhenRequestIsValid()
     {
         // Arrange
-        var command = new RegisterUser.Command("integration@test.com", "intuser", "password123");
+        var request = new RegisterRequest("integration@test.com", "intuser", "password123");
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/v1/auth/register", command);
+        var response = await Client.PostAsJsonAsync("/api/v1/auth/register", request);
 
         // Assert
         if (response.StatusCode != HttpStatusCode.OK)
@@ -27,8 +31,11 @@ public class AuthTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
         result.Should().NotBeNull();
-        result!.Token.Should().NotBeNullOrEmpty();
-        result.User.Username.Should().Be(command.Username);
+        result!.AccessToken.Should().NotBeNullOrEmpty();
+        result.User.Username.Should().Be(request.Username);
+
+        // Refresh token must arrive as an HttpOnly cookie, never in the body.
+        response.Headers.Should().ContainKey("Set-Cookie");
     }
 
     [Fact]
@@ -37,13 +44,13 @@ public class AuthTests : IntegrationTestBase
         // Arrange
         var email = "login@test.com";
         var password = "password123";
-        var registerCommand = new RegisterUser.Command(email, "loginuser", password);
-        await Client.PostAsJsonAsync("/api/v1/auth/register", registerCommand);
+        await Client.PostAsJsonAsync("/api/v1/auth/register",
+            new RegisterRequest(email, "loginuser", password));
 
-        var loginCommand = new { Email = email, Password = password };
+        var loginRequest = new LoginRequest(email, password);
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/v1/auth/login", loginCommand);
+        var response = await Client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);
 
         // Assert
         if (response.StatusCode != HttpStatusCode.OK)
@@ -54,6 +61,6 @@ public class AuthTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
         result.Should().NotBeNull();
-        result!.Token.Should().NotBeNullOrEmpty();
+        result!.AccessToken.Should().NotBeNullOrEmpty();
     }
 }

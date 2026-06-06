@@ -12,6 +12,12 @@ public interface IApplicationDbContext
     DbSet<ExternalEvent> ExternalEvents { get; }
     DbSet<Commit> Commits { get; }
     DbSet<PullRequest> PullRequests { get; }
+    DbSet<Ticket> Tickets { get; }
+    DbSet<TicketComment> TicketComments { get; }
+    DbSet<TicketStatusChange> TicketStatusChanges { get; }
+    DbSet<Incident> Incidents { get; }
+    DbSet<EntityReference> EntityReferences { get; }
+    DbSet<RefreshToken> RefreshTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

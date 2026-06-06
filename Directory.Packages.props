@@ -28,6 +28,7 @@
     <PackageVersion Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     
     <!-- Data & Infrastructure -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
@@ -59,6 +60,11 @@
     <!-- AI Integration -->
     <PackageVersion Include="Microsoft.SemanticKernel" Version="1.77.0" /> <!-- Abstraction layer for AI -->
     <PackageVersion Include="Microsoft.SemanticKernel.Connectors.Google" Version="1.77.0-alpha" /> <!-- Gemini support -->
+
+    <!-- HTTP resilience (Polly v8 under the hood). Wraps typed HttpClients with
+         retry / circuit breaker / timeout policies. We use it for the Gemini call
+         so transient 503 / 429 / network blips don't surface to the user. -->
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="8.10.0" />
     
     <!-- Analyzers (versions managed here, referenced in Directory.Build.props) -->
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="9.16.0.82469" />

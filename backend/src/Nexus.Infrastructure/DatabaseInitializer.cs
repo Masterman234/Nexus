@@ -16,26 +16,39 @@ public static class DatabaseInitializer
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        await db.Database.MigrateAsync(cancellationToken);
+        // Only run migrations if we're using a relational provider that isn't SQLite.
+        // Integration tests use SQLite where we use EnsureCreated() instead.
+        if (db.Database.IsNpgsql())
+        {
+            await db.Database.MigrateAsync(cancellationToken);
+        }
+        else if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+        {
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+        }
+        
         await SeedSystemUsersAsync(db, cancellationToken);
     }
 
     private static async Task SeedSystemUsersAsync(ApplicationDbContext db, CancellationToken cancellationToken)
     {
-        var botExists = await db.Users
-            .AsNoTracking()
-            .AnyAsync(u => u.Id == SystemUsers.GithubBotId, cancellationToken);
+        // Idempotent: each bot is checked + added independently so adding a new bot
+        // in code doesn't require dropping the existing seed.
+        await EnsureBotAsync(db, SystemUsers.GithubBotId, SystemUsers.GithubBotEmail,
+            SystemUsers.GithubBotUsername, cancellationToken);
+        await EnsureBotAsync(db, SystemUsers.NexusBotId, SystemUsers.NexusBotEmail,
+            SystemUsers.NexusBotUsername, cancellationToken);
+    }
 
-        if (botExists) return;
+    private static async Task EnsureBotAsync(
+        ApplicationDbContext db, Guid id, string email, string username, CancellationToken ct)
+    {
+        var exists = await db.Users.AsNoTracking().AnyAsync(u => u.Id == id, ct);
+        if (exists) return;
 
-        var bot = User.CreateSystem(
-            SystemUsers.GithubBotId,
-            SystemUsers.GithubBotEmail,
-            SystemUsers.GithubBotUsername);
+        db.Users.Add(User.CreateSystem(id, email, username));
+        await db.SaveChangesAsync(ct);
 
-        db.Users.Add(bot);
-        await db.SaveChangesAsync(cancellationToken);
-
-        Console.WriteLine($">>> [SEED] Created system user '{SystemUsers.GithubBotUsername}' ({SystemUsers.GithubBotId}).");
+        Console.WriteLine($">>> [SEED] Created system user '{username}' ({id}).");
     }
 }

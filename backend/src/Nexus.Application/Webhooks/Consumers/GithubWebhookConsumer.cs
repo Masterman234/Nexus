@@ -15,6 +15,7 @@ public class GithubWebhookConsumer(
     IApplicationDbContext dbContext,
     IChatService chatService,
     IConfiguration configuration,
+    IReferenceExtractor referenceExtractor,
     ILogger<GithubWebhookConsumer> logger)
     : IConsumer<GithubWebhookReceivedIntegrationEvent>
 {
@@ -142,6 +143,29 @@ public class GithubWebhookConsumer(
 
                 dbContext.Commits.Add(commit);
                 newCommits.Add(commit);
+
+                // NEX-24: Extract and persist entity references from commit message
+                var refs = referenceExtractor.Extract(commit.Message);
+                foreach (var r in refs)
+                {
+                    Guid? targetId = null;
+                    if (r.Type == "Ticket" && int.TryParse(r.Value.Replace("NEX-", "", StringComparison.OrdinalIgnoreCase), out var ticketNumber))
+                    {
+                        targetId = await dbContext.Tickets
+                            .Where(t => t.Number == ticketNumber)
+                            .Select(t => t.Id)
+                            .FirstOrDefaultAsync(ct);
+                    }
+
+                    var entityRef = EntityReference.Create(
+                        commit.Id,
+                        nameof(Commit),
+                        r.Type,
+                        r.Value,
+                        targetId);
+
+                    dbContext.EntityReferences.Add(entityRef);
+                }
             }
 
             if (newCommits.Count > 0)
@@ -223,6 +247,41 @@ public class GithubWebhookConsumer(
             pr = existingPr;
         }
 
+        // NEX-24: Extract and persist entity references from PR title and description
+        var combinedText = $"{title} {description}";
+        var prRefs = referenceExtractor.Extract(combinedText);
+
+        // Remove existing references for this PR to avoid duplicates on update
+        if (existingPr is not null)
+        {
+            var oldRefs = await dbContext.EntityReferences
+                .Where(er => er.SourceEntityId == pr.Id && er.SourceEntityType == nameof(PullRequest))
+                .ToListAsync(ct);
+
+            foreach (var old in oldRefs) dbContext.EntityReferences.Remove(old);
+        }
+
+        foreach (var r in prRefs)
+        {
+            Guid? targetId = null;
+            if (r.Type == "Ticket" && int.TryParse(r.Value.Replace("NEX-", "", StringComparison.OrdinalIgnoreCase), out var ticketNumber))
+            {
+                targetId = await dbContext.Tickets
+                    .Where(t => t.Number == ticketNumber)
+                    .Select(t => t.Id)
+                    .FirstOrDefaultAsync(ct);
+            }
+
+            var entityRef = EntityReference.Create(
+                pr.Id,
+                nameof(PullRequest),
+                r.Type,
+                r.Value,
+                targetId);
+
+            dbContext.EntityReferences.Add(entityRef);
+        }
+
         await dbContext.SaveChangesAsync(ct);
         logger.LogInformation(">>> [BOT] PR saved to DB.");
 
@@ -263,7 +322,7 @@ public class GithubWebhookConsumer(
         // Legacy fallback for first-run dev: pick the OLDEST channel named 'general'.
         // Logging this loudly so misconfig in prod doesn't go unnoticed.
         logger.LogWarning(">>> [BOT] WARN: Webhook:GithubTargetChannelId not configured. Falling back to oldest 'general' channel.");
-        
+
         var fallback = await dbContext.Channels
             .Where(c => c.Name == "general")
             .OrderBy(c => c.CreatedAt)
@@ -322,14 +381,14 @@ public class GithubWebhookConsumer(
             }
 
             var summary = $"🚀 **{pusherName}** just pushed {commitMsgs.Count} commit(s) to `{repoName}`";
-            
+
             if (commitMsgs.Count > 0)
             {
                 // Only show first 3 commits to avoid spamming
                 var displayCommits = commitMsgs.Take(3).ToList();
                 var list = string.Join("\n", displayCommits);
                 if (commitMsgs.Count > 3) list += $"\n> ... and {commitMsgs.Count - 3} more";
-                
+
                 return $"{summary}\n\n{list}";
             }
 

@@ -3,10 +3,27 @@ import * as signalR from "@microsoft/signalr"
 import { useAuthStore } from "./useAuthStore"
 import { useChatStore } from "./useChatStore"
 
+// SignalR payloads arrive with either camelCase or PascalCase keys depending on
+// the server serializer, so every field is modelled as optional in both casings.
+interface MessagePayload {
+  id?: string; Id?: string
+  channelId?: string; ChannelId?: string
+  content?: string; Content?: string
+  username?: string; Username?: string
+  sentAt?: string; SentAt?: string
+}
+
+interface ChannelPayload {
+  id?: string; Id?: string
+  name?: string; Name?: string
+  description?: string; Description?: string
+  workspaceId?: string; WorkspaceId?: string
+}
+
 export function useSignalR() {
   const connection = useRef<signalR.HubConnection | null>(null)
   const { token, isAuthenticated } = useAuthStore()
-  const { addMessage, updateMessage, deleteMessage, activeChannel } = useChatStore()
+  const { addMessage, updateMessage, deleteMessage, activeChannel, addChannel } = useChatStore()
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -37,27 +54,27 @@ export function useSignalR() {
         .configureLogging(signalR.LogLevel.Warning)
         .build()
 
-      connection.current.on("ReceiveMessage", (message: any) => {
+      connection.current.on("ReceiveMessage", (message: MessagePayload) => {
         console.log("%c [SignalR] Received Message:", "color: #06B6D4; font-weight: bold", message)
         const channelId = message.channelId || message.ChannelId
         if (channelId) {
           addMessage(channelId, {
-              id: message.id || message.Id,
-              content: message.content || message.Content,
-              username: message.username || message.Username,
-              sentAt: message.sentAt || message.SentAt
+              id: message.id || message.Id || "",
+              content: message.content || message.Content || "",
+              username: message.username || message.Username || "",
+              sentAt: message.sentAt || message.SentAt || ""
           })
         }
       })
 
-      connection.current.on("MessageUpdated", (message: any) => {
+      connection.current.on("MessageUpdated", (message: MessagePayload) => {
         const channelId = message.channelId || message.ChannelId
         if (channelId) {
           updateMessage(channelId, {
-              id: message.id || message.Id,
-              content: message.content || message.Content,
-              username: message.username || message.Username,
-              sentAt: message.sentAt || message.SentAt
+              id: message.id || message.Id || "",
+              content: message.content || message.Content || "",
+              username: message.username || message.Username || "",
+              sentAt: message.sentAt || message.SentAt || ""
           })
         }
       })
@@ -66,6 +83,16 @@ export function useSignalR() {
         if (activeChannel) {
             deleteMessage(activeChannel.id, messageId)
         }
+      })
+
+      connection.current.on("ChannelCreated", (channel: ChannelPayload) => {
+        console.log("%c [SignalR] Channel Created:", "color: #eab308; font-weight: bold", channel)
+        addChannel({
+          id: channel.id || channel.Id || "",
+          name: channel.name || channel.Name || "",
+          description: channel.description || channel.Description || "",
+          workspaceId: channel.workspaceId || channel.WorkspaceId || ""
+        })
       })
 
       connection.current
@@ -83,7 +110,7 @@ export function useSignalR() {
             }
         })
     }
-  }, [isAuthenticated, token, addMessage, updateMessage, deleteMessage, activeChannel])
+  }, [isAuthenticated, token, addMessage, updateMessage, deleteMessage, addChannel, activeChannel])
 
   useEffect(() => {
     if (connection.current?.state === signalR.HubConnectionState.Connected && activeChannel) {

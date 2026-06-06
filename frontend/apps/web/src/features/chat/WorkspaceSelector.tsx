@@ -8,6 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LayoutDashboard, Plus, Loader2 } from "lucide-react"
 
+interface Workspace {
+  id: string
+  name: string
+  description: string
+}
+
 export function WorkspaceSelector() {
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -19,7 +25,7 @@ export function WorkspaceSelector() {
 
   const { data: workspaces, isLoading } = useQuery({
     queryKey: ["workspaces"],
-    queryFn: async () => {
+    queryFn: async (): Promise<Workspace[]> => {
       const response = await api.get("/workspaces")
       return response.data
     }
@@ -105,7 +111,7 @@ export function WorkspaceSelector() {
               </div>
             ) : (
               <>
-                {workspaces?.map((workspace: any) => (
+                {workspaces?.map((workspace) => (
                   <Button
                     key={workspace.id}
                     variant="outline"

@@ -45,13 +45,13 @@ public static class GetChannels
             }
 
             var channels = await query
-                .Select(c => new ChannelResponse(c.Id, c.Name, c.Description, c.CreatedAt))
+                .Select(c => new ChannelResponse(c.Id, c.Name, c.Description, c.WorkspaceId, c.CreatedAt))
                 .ToListAsync(cancellationToken);
 
             if (channels.Count == 0)
             {
                  channels = await dbContext.Channels
-                    .Select(c => new ChannelResponse(c.Id, c.Name, c.Description, c.CreatedAt))
+                    .Select(c => new ChannelResponse(c.Id, c.Name, c.Description, c.WorkspaceId, c.CreatedAt))
                     .ToListAsync(cancellationToken);
             }
 
