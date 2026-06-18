@@ -13,25 +13,9 @@ into one timeline an agent can query.
 
 ## 🎯 What makes it different
 
-- **Cross-context AI reasoning.** Features like the [AI Standup Generator](./docs/tickets/initial-epics.md#epic-05-ai-standup-generator-tier-s)
-  and [Postmortem Assistant](./docs/tickets/initial-epics.md#epic-06-postmortem-assistant-tier-s)
-  query PRs + commits + incidents + chat in one Semantic Kernel call, surfacing
-  insights a single-source tool architecturally cannot produce.
-- **Event-spine architecture.** GitHub webhooks land in `ExternalEvent`, get
-  published as integration events on RabbitMQ, and fan out to consumers in each
-  bounded context. The pattern extends to any source — Stripe, CloudWatch,
-  PagerDuty — with one adapter per provider.
-- **Domain-Driven Design done pragmatically.** Clean Architecture layers,
-  bounded contexts (Collaboration, Engineering, Observability, AI), CQRS via
-  MediatR, integration events between contexts.
-- **Observability-first.** OpenTelemetry tracing across context boundaries from
-  Day 1 — you can follow a `git push` from webhook arrival through RabbitMQ to
-  SignalR broadcast in one trace.
-- **Real-time on a backplane.** SignalR + Redis backplane, so the system
-  horizontally scales without losing message ordering inside a channel.
-- **Documented tradeoffs.** [Architecture Decision Records (ADRs)](./docs/adrs/)
-  explain why each pattern was chosen — not just what was built.
-
+- **Cross-context AI reasoning across chat, pull requests, commits and incidents.
+- **Event-driven architecture powered by RabbitMQ and integration events.
+- **End-to-end observability with OpenTelemetry tracing and structured logging.
 ---
 
 ## 🏗️ Technology Stack
