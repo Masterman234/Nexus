@@ -11,9 +11,6 @@ chat UI is the surface; the real substance is a shared event spine (RabbitMQ +
 `ExternalEvent` audit log) that ingests signals from every system a team uses
 into one timeline an agent can query.
 
-This repository serves as a **portfolio-quality example** of cloud-native
-distributed architecture, pragmatic DDD, and observability-first engineering.
-
 ## 🎯 What makes it different
 
 - **Cross-context AI reasoning.** Features like the [AI Standup Generator](./docs/tickets/initial-epics.md#epic-05-ai-standup-generator-tier-s)
