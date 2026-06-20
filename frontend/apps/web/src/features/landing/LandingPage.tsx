@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { DemoActions } from "./DemoActions";
 import { 
   Activity, 
   MessageSquare, 
@@ -65,9 +66,7 @@ export function LandingPage() {
                     Build Your Workspace <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </Button>
-                <Button asChild variant="outline" size="lg" className="border-[#334155] hover:bg-[#1E293B] text-white font-bold rounded-2xl px-10 h-14 text-lg bg-transparent">
-                  <Link to="/login">View Live Demo</Link>
-                </Button>
+                <DemoActions />
               </div>
 
               {/* Illustration Placeholder */}

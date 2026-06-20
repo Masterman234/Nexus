@@ -24,6 +24,12 @@ obj/
 # Environment variables
 .env
 .env.*
+# ...but keep example/templates tracked.
+!.env.example
+!.env.prod.example
+
+# Local-only compose override for prod-parity testing (not for prod/CD).
+docker-compose.local.yml
 
 # Node
 node_modules/

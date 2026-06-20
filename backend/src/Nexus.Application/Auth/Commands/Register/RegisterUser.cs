@@ -41,9 +41,12 @@ public static class RegisterUser
 
             // Bootstrap the system: the very first human registration becomes Admin so
             // there is always at least one account that can promote others. Excludes
-            // seeded bot accounts (github-bot, nexus-bot) which exist before any human.
+            // seeded non-human accounts (github-bot, nexus-bot, and the demo guest)
+            // which exist before any human and must not steal the Admin bootstrap.
             var isFirstHuman = !await dbContext.Users
-                .AnyAsync(u => u.Id != SystemUsers.GithubBotId && u.Id != SystemUsers.NexusBotId, cancellationToken);
+                .AnyAsync(u => u.Id != SystemUsers.GithubBotId
+                    && u.Id != SystemUsers.NexusBotId
+                    && u.Id != SystemUsers.GuestUserId, cancellationToken);
 
             var user = User.Create(
                 request.Email,

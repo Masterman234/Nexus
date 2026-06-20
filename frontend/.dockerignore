@@ -1,0 +1,11 @@
+# Build context for the web image is the frontend/ workspace root.
+# Keep node_modules and build output out so installs are reproducible.
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+**/*.log
+.git
+.gitignore
+**/.env
+**/.env.*

@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nexus.Application.Auth;
+using Nexus.Application.Auth.Commands.GuestLogin;
 using Nexus.Application.Auth.Commands.Login;
 using Nexus.Application.Auth.Commands.Logout;
 using Nexus.Application.Auth.Commands.Refresh;
@@ -40,6 +41,18 @@ public class AuthController(ISender sender) : ControllerBase
         var result = await sender.Send(new LoginUser.Command(
             request.Email,
             request.Password,
+            CreatedByIp: GetClientIp(),
+            UserAgent: GetUserAgent()));
+
+        return EmitTokens(result);
+    }
+
+    [HttpPost("guest")]
+    public async Task<IActionResult> Guest()
+    {
+        // One-click demo login — no body, no credentials. Reuses the same token-emit
+        // path as login/register so the refresh cookie + response shape are identical.
+        var result = await sender.Send(new GuestLogin.Command(
             CreatedByIp: GetClientIp(),
             UserAgent: GetUserAgent()));
 

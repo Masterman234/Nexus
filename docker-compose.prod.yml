@@ -1,0 +1,117 @@
+# Production stack for Nexus — runs the full app on a single Docker host
+# (e.g. an Oracle Cloud Always Free VM). See docs/deploy-oracle.md.
+#
+# Secrets come from a `.env` file next to this compose file (NOT committed).
+# Copy .env.prod.example -> .env on the host and fill in real values.
+#
+# Local prod-parity test:   docker compose -f docker-compose.prod.yml up --build
+# Production (prebuilt):     docker compose -f docker-compose.prod.yml pull && \
+#                            docker compose -f docker-compose.prod.yml up -d
+#
+# API_IMAGE / WEB_IMAGE default to local tags; CD overrides them with the GHCR
+# image refs so `pull` fetches the images built by GitHub Actions.
+
+services:
+  nexus-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nexus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-nexus}
+    volumes:
+      - nexus-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexus} -d ${POSTGRES_DB:-nexus}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nexus-cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nexus-mq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?RABBITMQ_PASS is required}
+    volumes:
+      - nexus-mq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  nexus-api:
+    image: ${API_IMAGE:-nexus-api:latest}
+    build:
+      context: .
+      dockerfile: backend/src/Nexus.Api/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Kestrel listens on 8080 (matches nginx upstream in nexus-web).
+      ASPNETCORE_URLS: http://+:8080
+      # ConnectionStrings:DefaultConnection — double-underscore maps to the nested key.
+      ConnectionStrings__DefaultConnection: "Host=nexus-db;Port=5432;Database=${POSTGRES_DB:-nexus};Username=${POSTGRES_USER:-nexus};Password=${POSTGRES_PASSWORD}"
+      REDIS_CONNECTION_STRING: "nexus-cache:6379"
+      RABBITMQ_HOST: "nexus-mq"
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+      Jwt__Secret: ${JWT_SECRET:?JWT_SECRET is required (>=32 bytes)}
+      Jwt__RefreshTokenPepper: ${JWT_REFRESH_PEPPER:?JWT_REFRESH_PEPPER is required}
+      Jwt__Issuer: "Nexus"
+      Jwt__Audience: "Nexus"
+      Gemini__ApiKey: ${GEMINI_API_KEY:-}
+      Webhook__GithubSecret: ${WEBHOOK_GITHUB_SECRET:-}
+      Webhook__GithubTargetChannelId: ${WEBHOOK_GITHUB_TARGET_CHANNEL_ID:-}
+      # Turn on demo workspace/channels/tickets seeding for the public demo.
+      Seed__Demo: ${SEED_DEMO:-false}
+      # OpenTelemetry exporter is optional in prod; leave unset to disable.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    depends_on:
+      nexus-db:
+        condition: service_healthy
+      nexus-cache:
+        condition: service_healthy
+      nexus-mq:
+        condition: service_healthy
+
+  nexus-web:
+    image: ${WEB_IMAGE:-nexus-web:latest}
+    build:
+      context: ./frontend
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - nexus-api
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # The DuckDNS domain Caddy provisions a Let's Encrypt cert for.
+      NEXUS_DOMAIN: ${NEXUS_DOMAIN:?NEXUS_DOMAIN is required (e.g. nexus-demo.duckdns.org)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - nexus-web
+
+volumes:
+  nexus-db-data:
+  nexus-mq-data:
+  caddy-data:
+  caddy-config:
