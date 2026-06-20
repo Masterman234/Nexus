@@ -1,0 +1,13 @@
+# Caddy edge proxy for Nexus.
+# Caddy automatically provisions and renews a Let's Encrypt TLS certificate for
+# {$NEXUS_DOMAIN} (set in the host .env, e.g. nexus-demo.duckdns.org), as long as
+# ports 80 and 443 are reachable from the internet.
+#
+# All traffic is forwarded to the nexus-web (nginx) container, which serves the
+# SPA and itself proxies /api and /chatHub to the API. Caddy handles WebSocket
+# upgrades transparently, so SignalR works over wss://.
+
+{$NEXUS_DOMAIN} {
+	encode gzip zstd
+	reverse_proxy nexus-web:80
+}

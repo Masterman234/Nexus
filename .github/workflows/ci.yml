@@ -1,0 +1,69 @@
+name: CI
+
+# Build + test on every push and PR. No live services are needed:
+# integration tests use in-memory SQLite and mock Redis/MassTransit
+# (see backend/tests/Nexus.IntegrationTests/IntegrationTestBase.cs).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Matches global.json so the SDK version is identical to local dev.
+          dotnet-version: "8.0.307"
+
+      - name: Restore
+        run: dotnet restore Nexus.sln
+
+      - name: Build
+        run: dotnet build Nexus.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test Nexus.sln -c Release --no-build --verbosity normal
+
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+    # The pnpm workspace root is frontend/ (pnpm-workspace.yaml + lockfile live there).
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # Lockfile is v9.0 -> requires pnpm 9+.
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter web lint
+
+      - name: Build
+        run: pnpm --filter web build

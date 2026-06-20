@@ -1,0 +1,27 @@
+# Root build context for the API image (backend/src/Nexus.Api/Dockerfile uses
+# the repo root as context to copy the .props files + all backend projects).
+# Exclude everything that doesn't belong in a .NET build to keep the context small.
+
+# Frontend (not part of the API image)
+frontend/
+
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# IDE / tooling
+.vs/
+.vscode/
+.idea/
+.claude/
+.github/
+
+# Local env + secrets
+**/.env
+**/.env.*
+
+# Docs, git, logs
+docs/
+.git
+.gitignore
+**/*.log

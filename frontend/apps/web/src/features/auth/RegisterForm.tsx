@@ -6,7 +6,8 @@ import { useAuthStore, type User } from "@/store/useAuthStore"
 
 interface AuthResponse {
   user: User
-  token: string
+  // Backend (AuthResponse record) serializes the JWT as `accessToken`.
+  accessToken: string
 }
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,7 +26,7 @@ export function RegisterForm() {
       return response.data
     },
     onSuccess: (data: AuthResponse) => {
-      setAuth(data.user, data.token)
+      setAuth(data.user, data.accessToken)
     },
   })
 

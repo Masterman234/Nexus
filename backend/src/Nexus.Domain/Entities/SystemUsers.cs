@@ -15,4 +15,11 @@ public static class SystemUsers
     public static readonly Guid NexusBotId = new("22222222-2222-2222-2222-222222222222");
     public const string NexusBotUsername = "nexus-bot";
     public const string NexusBotEmail = "nexus-bot@nexus.system";
+
+    // Public-demo guest account. Has no password — it is authenticated only via the
+    // dedicated guest-login command (no credential check), so the demo deployment can
+    // offer a one-click "Try the demo" experience. Seeded alongside the bots.
+    public static readonly Guid GuestUserId = new("33333333-3333-3333-3333-333333333333");
+    public const string GuestUsername = "guest";
+    public const string GuestEmail = "guest@nexus.system";
 }

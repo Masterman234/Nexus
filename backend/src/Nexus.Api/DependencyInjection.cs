@@ -117,7 +117,10 @@ public static class DependencyInjection
                 name: "Redis",
                 tags: ["cache", "redis"])
             .AddRabbitMQ(
-                new Uri($"amqp://{configuration["RABBITMQ_HOST"] ?? "localhost"}"),
+                // Must carry the same credentials MassTransit uses (see
+                // Infrastructure/DependencyInjection UsingRabbitMq); without them the
+                // probe falls back to guest/guest and fails on a non-default broker.
+                new Uri($"amqp://{configuration["RABBITMQ_USER"] ?? "guest"}:{configuration["RABBITMQ_PASS"] ?? "guest"}@{configuration["RABBITMQ_HOST"] ?? "localhost"}:5672/"),
                 name: "RabbitMQ",
                 tags: ["messaging", "rabbitmq"]);
 
